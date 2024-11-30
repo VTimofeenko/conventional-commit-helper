@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use clap::{ArgAction, Parser, ValueEnum};
 use log::debug;
 
@@ -24,9 +25,10 @@ struct Args {
     #[arg(long)]
     json: bool,
 
-    // /// Path to the non-bare git repository.
-    // #[arg(long, default_value = ".")]
-    // repo_path: PathBuf,
+    /// Path to the non-bare git repository.
+    #[arg(long, default_value = ".")]
+    repo_path: PathBuf,
+
     #[arg(long, action=ArgAction::SetTrue)]
     debug: bool,
     // /// Path to the file containing conventional commit types for the repository.
@@ -51,7 +53,7 @@ fn main() -> anyhow::Result<()> {
     let output = match args.mode {
         Some(x) => match x {
             Mode::Type => {
-                commit_types::get_commit_types_from_repo_or_default(std::env::current_dir()?)?
+                commit_types::get_commit_types_from_repo_or_default(args.repo_path)?
             }
             Mode::Scope => todo!(),
         },
