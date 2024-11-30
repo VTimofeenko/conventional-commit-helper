@@ -68,8 +68,6 @@ pub type UserProvidedCommitType = CommitType<String>;
 //     }
 // }
 
-// This would be better off as a trait alias but those are experimental at the time
-pub type PathLike = dyn AsRef<Path>;
 // pub use PrintableEntity as CommitScope;
 
 pub const DEFAULT_CONFIG_PATH_IN_REPO: &str =
