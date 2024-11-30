@@ -91,11 +91,9 @@ impl Config {
     ///
     /// Extracted for easier testing
     fn from_toml(toml_value: HashMap<String, HashMap<String, String>>) -> Result<Self> {
-        let commit_types: Option<Vec<UserProvidedCommitType>> = toml_value.get("types").map(|x| {
-            x.iter()
-                .map(UserProvidedCommitType::from)
-                .collect()
-        });
+        let commit_types: Option<Vec<UserProvidedCommitType>> = toml_value
+            .get("types")
+            .map(|x| x.iter().map(UserProvidedCommitType::from).collect());
         Ok(Self { commit_types })
     }
     pub fn from_file(path: &Path) -> Result<Option<Self>> {

@@ -3,8 +3,8 @@ use log::debug;
 
 use self::commit_types::get_default_commit_types;
 
-mod utils;
 mod commit_types;
+mod utils;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Mode {
@@ -50,9 +50,11 @@ fn main() -> anyhow::Result<()> {
 
     let output = match args.mode {
         Some(x) => match x {
-            Mode::Type => commit_types::get_commit_types_from_repo_or_default(".")?,
+            Mode::Type => {
+                commit_types::get_commit_types_from_repo_or_default(std::env::current_dir()?)?
+            }
             Mode::Scope => todo!(),
-        }
+        },
         None => {
             debug!("No modes passed as an arg, running default action");
             get_default_commit_types()

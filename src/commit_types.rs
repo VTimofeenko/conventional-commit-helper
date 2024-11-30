@@ -14,15 +14,22 @@ where
     P: Into<PathBuf> + AsRef<Path> + std::fmt::Debug,
 {
     // Try to find repo at location.
+    debug!("Looking for a repo at {:?}", path);
+
     let repo: Repository = match Repository::discover(path) {
         Ok(x) => x,
         Err(err) => match err.code() {
             // No repo -- OK, don't need to search it
-            git2::ErrorCode::NotFound => return Ok(None),
+            git2::ErrorCode::NotFound => {
+                debug!("No repo found at location");
+                return Ok(None);
+            }
             // Return any other error
             _ => bail!(err),
         },
     };
+
+    debug!("Repo found, checking for config file");
 
     match try_config_file_in_repo(repo)? {
         Some(config) => {
@@ -41,8 +48,14 @@ where
     P: Into<PathBuf> + AsRef<Path> + std::fmt::Debug,
 {
     match try_get_commit_types_from_repo_at_path(path)? {
-        Some(x) => Ok(x),
-        None => Ok(get_default_commit_types()),
+        Some(x) => {
+            debug!("Found custom commit types, returning them");
+            Ok(x)
+        }
+        None => {
+            debug!("No custom commit types found, returning default");
+            Ok(get_default_commit_types())
+        }
     }
 }
 
@@ -62,11 +75,11 @@ pub fn get_default_commit_types() -> Vec<CommitType<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::DEFAULT_CONFIG_PATH_IN_REPO;
-    use conventional_commit_helper::test_utils::setup_repo_with_commits;
+    use conventional_commit_helper::test_utils::{
+        setup_config_file_in_path, setup_repo_with_commits,
+    };
     use indoc::indoc;
     use rstest::{fixture, rstest};
-    use std::fs;
     use std::sync::Once;
     use testdir::testdir;
 
@@ -90,15 +103,6 @@ mod tests {
                 foo = "bar"
                 "#}
         .to_string()
-    }
-
-    /// Creates a fake config file at target location with commit types
-    /// Only produces side-effect of a file.
-    fn setup_custom_commit_type_file(tmpdir: &Path) {
-        let config_path = tmpdir.join(DEFAULT_CONFIG_PATH_IN_REPO);
-        debug!("Setting up config path at {:?}", config_path);
-        let _ = fs::create_dir_all(config_path.parent().unwrap());
-        fs::write(config_path, mk_types()).unwrap();
     }
 
     /// Checks that fallback works for various paths
@@ -136,7 +140,8 @@ mod tests {
         init_logger();
         let dir = testdir!();
         let repo = setup_repo_with_commits(&dir, &["init"]);
-        setup_custom_commit_type_file(&dir);
+        // This test should control its own commit types to test
+        setup_config_file_in_path(&dir, &mk_types());
 
         let res = get_commit_types_from_repo_or_default(repo.workdir().unwrap()).unwrap();
 

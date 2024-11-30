@@ -1,12 +1,14 @@
 pub mod test_utils {
-    use std::path::Path;
+    use git2::{Oid, Repository, Signature};
+    use log::debug;
     use std::fs;
-    use git2::{Repository, Oid, Signature};
+    use std::path::{Path, PathBuf};
 
     /// Set up a fake repo with commits based on the argument
     /// tmpdir is passed as a param so that it's created in the calling test
     pub fn setup_repo_with_commits(tmpdir: &Path, commit_msgs: &[&str]) -> Repository {
         let repo = Repository::init(tmpdir).unwrap();
+        debug!("Setting up a repo at {:?}", tmpdir);
 
         let mut parent_commit: Option<Oid> = None;
 
@@ -44,5 +46,23 @@ pub mod test_utils {
         });
 
         repo
+    }
+
+    pub fn mk_config_with_types_only(tmpdir: &Path) {
+        let content = r#"
+                [types]
+                foo = "bar"
+                "#
+        .to_string();
+        setup_config_file_in_path(tmpdir, &content);
+    }
+
+    pub fn setup_config_file_in_path(tmpdir: &Path, content: &str) -> PathBuf {
+        debug!("Setting up config file at {:?}", tmpdir);
+        let config_path = tmpdir.join(".dev/conventional-commit-helper.json");
+        let _ = fs::create_dir_all(config_path.parent().unwrap());
+        fs::write(&config_path, content).unwrap();
+
+        config_path
     }
 }
