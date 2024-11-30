@@ -93,7 +93,7 @@ impl Config {
     fn from_toml(toml_value: HashMap<String, HashMap<String, String>>) -> Result<Self> {
         let commit_types: Option<Vec<UserProvidedCommitType>> = toml_value.get("types").map(|x| {
             x.iter()
-                .map(|kvpair| UserProvidedCommitType::from(kvpair))
+                .map(UserProvidedCommitType::from)
                 .collect()
         });
         Ok(Self { commit_types })
