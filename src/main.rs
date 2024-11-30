@@ -1,8 +1,10 @@
 use clap::{ArgAction, Parser, ValueEnum};
 use log::debug;
-use utils::DEFAULT_COMMIT_TYPES;
+
+use self::commit_types::get_default_commit_types;
 
 mod utils;
+mod commit_types;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Mode {
@@ -47,10 +49,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     let output = match args.mode {
-        Some(_x) => todo!(),
+        Some(x) => match x {
+            Mode::Type => commit_types::get_commit_types_from_repo_or_default(".")?,
+            Mode::Scope => todo!(),
+        }
         None => {
             debug!("No modes passed as an arg, running default action");
-            DEFAULT_COMMIT_TYPES
+            get_default_commit_types()
         }
     };
 

@@ -6,14 +6,25 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.93"
 clap = { version = "4.5.21", features = ["derive"] }
+# Used to format a constant
+const_format = "0.2.33"
 env_logger = "0.11.5"
+# This project works with repositories a lot
+# Default features is disabled as there's no need to verify the signatures on
+# the repo and cargo does not seem to have the notion of
+# "SUBTRACT(default_feature_set, $feature)"
+git2 = { version = "0.19.0", default-features = false }
 log = "0.4.22"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
+# Config file is in toml format
+toml = "0.8.19"
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
 assert_fs = "1.1.2"
+# Used to generate smart-dedented strings like nix
+indoc = "2.0.5"
 predicates = "3.1.2"
 rstest = "0.23.0"
 testdir = "0.9.1"
