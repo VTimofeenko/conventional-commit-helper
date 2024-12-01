@@ -48,13 +48,26 @@ pub mod test_utils {
         repo
     }
 
-    pub fn mk_config_with_types_only(tmpdir: &Path) {
-        let content = r#"
+    const TYPES_ONLY_CONFIG: &str = r#"
                 [types]
                 foo = "bar"
-                "#
-        .to_string();
-        setup_config_file_in_path(tmpdir, &content);
+                "#;
+
+    pub fn mk_config_with_types_only(tmpdir: &Path) {
+        setup_config_file_in_path(tmpdir, TYPES_ONLY_CONFIG);
+    }
+
+    const SCOPES_ONLY_CONFIG: &str = r#"
+                [scopes]
+                foz = "baz"
+                "#;
+
+    pub fn mk_config_with_scopes_only(tmpdir: &Path) {
+        setup_config_file_in_path(tmpdir, SCOPES_ONLY_CONFIG);
+    }
+
+    pub fn mk_config_full(tmpdir: &Path) {
+        setup_config_file_in_path(tmpdir, &(TYPES_ONLY_CONFIG.to_owned() + SCOPES_ONLY_CONFIG));
     }
 
     pub fn setup_config_file_in_path(tmpdir: &Path, content: &str) -> PathBuf {

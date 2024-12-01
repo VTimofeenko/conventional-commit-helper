@@ -1,5 +1,7 @@
 use assert_cmd::Command;
-use conventional_commit_helper::test_utils::{mk_config_with_types_only, setup_repo_with_commits};
+use conventional_commit_helper::test_utils::{
+    mk_config_full, mk_config_with_scopes_only, mk_config_with_types_only, setup_repo_with_commits,
+};
 use predicates::prelude::*;
 use std::sync::Once;
 
@@ -38,6 +40,73 @@ fn check_custom_repo_with_config() {
     cmd.assert().success();
 
     cmd.assert().stdout(predicate::str::contains("foo"));
+}
+
+/// Set up a custom repo with a custom config file and check that it's returned
+#[test]
+fn check_custom_repo_with_config_and_scopes() {
+    init_logger();
+
+    // Set up environment
+    let dir = assert_fs::TempDir::new().unwrap();
+    let _ = setup_repo_with_commits(dir.path(), &["init", "foo(qux): quux"]);
+    mk_config_with_scopes_only(dir.path());
+
+    // Setup command
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.arg("scope");
+    cmd.arg("--debug");
+    // Change CWD to the fake repo
+    cmd.current_dir(dir.path());
+
+    // Test
+    cmd.assert().success();
+
+    // From config
+    cmd.assert().stdout(predicate::str::contains("foz"));
+    // From history
+    cmd.assert().stdout(predicate::str::contains("qux"));
+}
+
+/// Sets up a repo with a config and commits and scopes. Checks that everything is as expected
+#[test]
+fn all_together_now() {
+    init_logger();
+
+    // Set up environment
+    let dir = assert_fs::TempDir::new().unwrap();
+    let _ = setup_repo_with_commits(dir.path(), &["init", "foo(qux): quux"]);
+    mk_config_full(dir.path());
+
+    // Test types
+    // Setup command
+    let mut cmd_types = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd_types.arg("type");
+    cmd_types.arg("--debug");
+    // Change CWD to the fake repo
+    cmd_types.current_dir(dir.path());
+
+    // Test
+    cmd_types.assert().success();
+
+    // From config
+    cmd_types.assert().stdout(predicate::str::contains("foo"));
+
+    // Test scopes
+    // Setup command
+    let mut cmd_scopes = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd_scopes.arg("scope");
+    cmd_scopes.arg("--debug");
+    // Change CWD to the fake repo
+    cmd_scopes.current_dir(dir.path());
+
+    // Test
+    cmd_scopes.assert().success();
+
+    // From config
+    cmd_scopes.assert().stdout(predicate::str::contains("foz"));
+    // From history
+    cmd_scopes.assert().stdout(predicate::str::contains("qux"));
 }
 
 // Ensure logger is initialized only once for all tests
