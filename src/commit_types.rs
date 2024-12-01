@@ -1,37 +1,16 @@
-use anyhow::{bail, Result};
-use git2::Repository;
+use anyhow::Result;
 use log::debug;
 // use std::fs::File;
 // use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
-use crate::utils::{
-    try_config_file_in_repo, CommitType, UserProvidedCommitType, DEFAULT_COMMIT_TYPES,
-};
+use crate::utils::{CommitType, Config, UserProvidedCommitType, DEFAULT_COMMIT_TYPES};
 
 fn try_get_commit_types_from_repo_at_path<P>(path: P) -> Result<Option<Vec<UserProvidedCommitType>>>
 where
     P: Into<PathBuf> + AsRef<Path> + std::fmt::Debug,
 {
-    // Try to find repo at location.
-    debug!("Looking for a repo at {:?}", path);
-
-    let repo: Repository = match Repository::discover(path) {
-        Ok(x) => x,
-        Err(err) => match err.code() {
-            // No repo -- OK, don't need to search it
-            git2::ErrorCode::NotFound => {
-                debug!("No repo found at location");
-                return Ok(None);
-            }
-            // Return any other error
-            _ => bail!(err),
-        },
-    };
-
-    debug!("Repo found, checking for config file");
-
-    match try_config_file_in_repo(repo)? {
+    match Config::from_repo_at_path(&path)? {
         Some(config) => {
             debug!("Found config in repo, returning its commit_types");
             Ok(config.commit_types)

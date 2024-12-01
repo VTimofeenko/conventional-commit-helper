@@ -1,9 +1,11 @@
-use std::path::PathBuf;
 use clap::{ArgAction, Parser, ValueEnum};
 use log::debug;
+use std::path::PathBuf;
 
 use self::commit_types::get_default_commit_types;
+use self::utils::PrintableEntity;
 
+mod commit_scopes;
 mod commit_types;
 mod utils;
 
@@ -50,12 +52,12 @@ fn main() -> anyhow::Result<()> {
         debug!("Launched with args: {:?}", args);
     }
 
-    let output = match args.mode {
+    let output: Vec<PrintableEntity<String>> = match args.mode {
         Some(x) => match x {
-            Mode::Type => {
-                commit_types::get_commit_types_from_repo_or_default(args.repo_path)?
-            }
-            Mode::Scope => todo!(),
+            Mode::Type => commit_types::get_commit_types_from_repo_or_default(args.repo_path)?,
+            // Handle "no custom scopes", provide fallback value
+            Mode::Scope => commit_scopes::try_get_commit_scopes_from_repo_at_path(args.repo_path)?
+                .unwrap_or_else(Vec::new),
         },
         None => {
             debug!("No modes passed as an arg, running default action");

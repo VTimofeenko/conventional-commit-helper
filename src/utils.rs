@@ -2,11 +2,12 @@ use anyhow::{bail, Result};
 use const_format::formatcp;
 use core::fmt;
 use git2::Repository;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 use std::path::MAIN_SEPARATOR;
+use std::path::{Path, PathBuf};
 
 /// This is a generic printable thing. The concrete examples would be:
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
@@ -68,7 +69,8 @@ pub type UserProvidedCommitType = CommitType<String>;
 //     }
 // }
 
-// pub use PrintableEntity as CommitScope;
+pub use PrintableEntity as CommitScope;
+pub type UserProvidedCommitScope = CommitScope<String>;
 
 pub const DEFAULT_CONFIG_PATH_IN_REPO: &str =
     formatcp!(".dev{}conventional-commit-helper.json", MAIN_SEPARATOR);
@@ -80,6 +82,9 @@ pub struct Config {
     // The code should use commit_types to be less ambiguous about the 'type' word
     #[serde(rename = "types")]
     pub commit_types: Option<Vec<UserProvidedCommitType>>,
+
+    #[serde(rename = "scopes")]
+    pub commit_scopes: Option<Vec<UserProvidedCommitScope>>,
 }
 
 impl Config {
@@ -94,7 +99,13 @@ impl Config {
         let commit_types: Option<Vec<UserProvidedCommitType>> = toml_value
             .get("types")
             .map(|x| x.iter().map(UserProvidedCommitType::from).collect());
-        Ok(Self { commit_types })
+        let commit_scopes: Option<Vec<UserProvidedCommitType>> = toml_value
+            .get("scopes")
+            .map(|x| x.iter().map(UserProvidedCommitScope::from).collect());
+        Ok(Self {
+            commit_types,
+            commit_scopes,
+        })
     }
     pub fn from_file(path: &Path) -> Result<Option<Self>> {
         match path.exists() {
@@ -110,14 +121,39 @@ impl Config {
             false => Ok(None),
         }
     }
-}
 
-pub fn try_config_file_in_repo(repo: Repository) -> Result<Option<Config>> {
-    if repo.is_bare() {
-        bail!("Repository is bare, should not search for a config there.")
+    pub fn from_repo_at_path<P>(path: &P) -> Result<Option<Self>>
+    where
+        P: Into<PathBuf> + AsRef<Path> + std::fmt::Debug,
+    {
+        // Try to find repo at location.
+        debug!("Looking for a repo at {:?}", path);
+
+        let repo: Repository = match Repository::discover(path) {
+            Ok(x) => x,
+            Err(err) => match err.code() {
+                // No repo -- OK, don't need to search it
+                git2::ErrorCode::NotFound => {
+                    debug!("No repo found at location");
+                    return Ok(None);
+                }
+                // Return any other error
+                _ => bail!(err),
+            },
+        };
+
+        debug!("Repo found, checking for config file");
+
+        Self::try_config_file_in_repo(repo)
     }
 
-    Config::from_file(&repo.workdir().unwrap().join(DEFAULT_CONFIG_PATH_IN_REPO))
+    fn try_config_file_in_repo(repo: Repository) -> Result<Option<Self>> {
+        if repo.is_bare() {
+            bail!("Repository is bare, should not search for a config there.")
+        }
+
+        Self::from_file(&repo.workdir().unwrap().join(DEFAULT_CONFIG_PATH_IN_REPO))
+    }
 }
 
 pub const DEFAULT_COMMIT_TYPES: &[BundledCommitType] = &[
@@ -178,6 +214,8 @@ mod test {
         let toml_data = indoc! {r#"
                 [types]
                 foo = "bar"
+                [scopes]
+                foz = "baz"
                 "#};
 
         let res = Config::from_toml(
@@ -188,6 +226,10 @@ mod test {
             commit_types: Some(vec![UserProvidedCommitType {
                 name: "foo".to_string(),
                 description: "bar".to_string(),
+            }]),
+            commit_scopes: Some(vec![UserProvidedCommitScope {
+                name: "foz".to_string(),
+                description: "baz".to_string(),
             }]),
         };
 
