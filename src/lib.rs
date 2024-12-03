@@ -1,23 +1,45 @@
 pub mod test_utils {
     use git2::{Oid, Repository, Signature};
+    use itertools::Itertools;
     use log::debug;
     use std::fs;
     use std::path::{Path, PathBuf};
 
     /// Set up a fake repo with commits based on the argument
     /// tmpdir is passed as a param so that it's created in the calling test
-    pub fn setup_repo_with_commits(tmpdir: &Path, commit_msgs: &[&str]) -> Repository {
+    pub fn setup_repo_with_commits_and_files(
+        tmpdir: &Path,
+        commit_msgs: &[&str],
+        files: &[&str],
+    ) -> Repository {
         let repo = Repository::init(tmpdir).unwrap();
-        debug!("Setting up a repo at {:?}", tmpdir);
+        debug!(
+            "Setting up a repo at {:?} with {:?} commits (including initial)",
+            tmpdir,
+            commit_msgs.len()
+        );
+
+        debug!("{}", commit_msgs.iter().zip_longest(files.iter()).len());
 
         let mut parent_commit: Option<Oid> = None;
 
-        commit_msgs.iter().for_each(|commit_msg| {
-            let file_path = tmpdir.join("helloworld");
+        // Iterate over commit messages and files (if those exist) commit messages are the ones
+        // that are more important for tests so if there is no file specified -- generated fake
+        // commit will just touch a fallback file
+        //
+        // The fake commits will write the commit message into the file.
+        commit_msgs.iter().zip_longest(files).for_each(|pair| {
+            let commit_msg = pair.clone().left().unwrap();
+            let file = pair.right().unwrap_or(&"default_file");
+            debug!("Setting up commit with message '{:?}'", commit_msg);
+            let file_path = tmpdir.join(file);
+            debug!("It should go into the file {:?}", file_path);
+            debug!("Writing garbage to {:?}", file_path);
             fs::write(file_path, commit_msg).unwrap();
 
             let mut index = repo.index().unwrap();
-            let _ = index.add_path(Path::new("helloworld"));
+            let _ = index.add_path(Path::new(file)); // File has to be relative to the repo to be
+                                                     // committed
             let _ = index.write();
 
             let sig = Signature::now("nobody", "nobody@example.com").unwrap();
@@ -46,6 +68,10 @@ pub mod test_utils {
         });
 
         repo
+    }
+
+    pub fn setup_repo_with_commits(tmpdir: &Path, commit_msgs: &[&str]) -> git2::Repository {
+        setup_repo_with_commits_and_files(tmpdir, commit_msgs, &[])
     }
 
     const TYPES_ONLY_CONFIG: &str = r#"
