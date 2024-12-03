@@ -1,5 +1,101 @@
+#![allow(dead_code)]
+use anyhow::Result;
+use git2::{Commit, Repository};
 use log::debug;
 use regex::Regex;
+use std::collections::{HashMap, HashSet};
+
+use crate::utils::UserProvidedCommitScope;
+
+/// Things that deal with the repository go here
+/// The logic to extract scope x paths will be here. The logic to extract commit messages into
+/// scopes should also go here
+///
+///
+/// The plan
+///
+/// 1. ✓ Learn how to traverse commits back to the beginning
+/// 2. ✓ Learn how to get changes for commit
+/// 3. ✓ Move "extract scope" logic to this file
+/// 4. ✓ Construct scope x file changes mapping
+/// 5. ✓ Learn how to get staged files
+/// 6. ✓ Devicse some smart distance between staged files and sets of file changes to suggest the
+///    best matching scope
+/// 7. TODOs
+/// 8. No unwraps in non-test code
+/// 9. ???
+/// 10. PROFIT
+///
+
+// As a design decision, I am working with file names and not paths. The key point of this
+// structure is to be able to quickly compare two sets of changed files by names. As a first
+// approach I will use strings for Levenstein-like distance(?).
+//
+// If I want to switch over to subpath checking or whatever -- I should probably move this
+// structure to hashset of paths.
+pub type ChangedFiles = HashSet<String>;
+/// Returns the list of changed files
+///
+/// Using hashset to explicitly denote that there is no order
+fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedFiles {
+    let mut res = HashSet::new(); // Accumulator object
+
+    let tree = commit.tree().unwrap();
+
+    // no parents <=> initial commit?
+    if commit.parent_count() != 0 {
+        // This follows only one parent
+        // TODO: iterate over parents properly
+        let parent = commit.parent(0).unwrap();
+        let parent_tree = parent.tree().unwrap();
+        let diff = repo
+            .diff_tree_to_tree(
+                Some(&parent_tree),
+                Some(&tree),
+                Some(&mut git2::DiffOptions::new()),
+            )
+            .unwrap();
+
+        diff.deltas().for_each(|delta| {
+            let changed_file = delta
+                .new_file()
+                .path()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+            res.insert(changed_file);
+        });
+    };
+    res
+}
+
+/// This function should be called on a repo to get the staged files
+///
+/// No files staged -- return None
+pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
+    let paths: ChangedFiles = repo
+        .statuses(None)?
+        .iter()
+        // Filter only the staged things
+        .filter(|x| {
+            matches!(
+                x.status(),
+                git2::Status::INDEX_NEW
+                    | git2::Status::INDEX_MODIFIED
+                    | git2::Status::INDEX_DELETED
+                    | git2::Status::INDEX_RENAMED
+            )
+        })
+        // .path() may yield None on bad non-utf8 paths
+        // TODO: properly report this error
+        .filter_map(|x| x.path().map(|p| p.to_string()))
+        .collect();
+
+    // TODO: debug if no files changed
+    Ok((!paths.is_empty()).then_some(paths))
+}
+
 /// Given a single commit message, tries to find a scope in it
 pub fn get_scope_from_commit_message(message: &str) -> Option<String> {
     // Typically scopes are found in the brackets:
@@ -9,10 +105,198 @@ pub fn get_scope_from_commit_message(message: &str) -> Option<String> {
     // TODO: maybe only show this for very verbose output
     debug!("Checking git commit message {:?}", message);
 
+    mat.map(|arg0: regex::Match<'_>| {
+        // Return the string, except for first and last chars which are brackets
+        // This should be faster than capture groups
+        // Rust regex does not have look(around|behind)
+        let res = regex::Match::as_str(&arg0);
+        let result = res[1..res.len() - 1].to_string();
+
+        debug!("Found: {:?}", result);
+        result
+    })
+}
+
+pub fn get_scopes_x_changes(
+    repo: &Repository,
+) -> Result<Option<HashMap<UserProvidedCommitScope, ChangedFiles>>> {
+    // idea:
+    // Have an accumulator
+    // Walk through the repo using reflog?
+    // For every commit, if there is a scope in the message -- get its diff and append to the
+    // accumulator
+    let mut accumulator = HashMap::<UserProvidedCommitScope, ChangedFiles>::new();
+
+    // TODO: reflog vs rewalk -- latter may expose commits as is without an extra lookup
+    repo.reflog("HEAD")?.iter().for_each(|reflog_entry| {
+        let commit = repo.find_commit(reflog_entry.id_new()).unwrap();
+        let scope =
+            get_scope_from_commit_message(commit.message().expect("Commit should have a message"));
+        if let Some(extracted_scope) = scope {
+            let scope_obj = UserProvidedCommitScope::new(extracted_scope);
+            let changed_files = get_changed_files_from_commit(&commit, repo);
+
+            if let Some(existing_changed_files) = accumulator.get_mut(&scope_obj) {
+                existing_changed_files.extend(changed_files);
+            } else {
+                accumulator.insert(scope_obj, changed_files);
+            }
+        }
+    });
+
+    Ok((!accumulator.is_empty()).then_some(accumulator))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use conventional_commit_helper::test_utils::setup_repo_with_commits_and_files;
     use rstest::rstest;
+    use std::path::Path;
+    use testdir::testdir;
+
+    //#[rstest]
+    //fn test_get_commit_files() {
+    //    let dir = testdir!();
+    //    let repo = setup_repo_with_commits_and_files(
+    //        &dir,
+    //        &["init", "foo(foz): bar", "foo"], // commit msgs
+    //        &["init", "one", "two"],           // files
+    //    );
+
+    //    // Get the current branch
+    //    let head = repo.head().unwrap();
+
+    //    // Get the commit object of the current branch
+    //    let obj = head.peel_to_commit().unwrap();
+
+    //    // Create a revwalk to iterate over commits
+    //    let mut revwalk = repo.revwalk().unwrap();
+    //    revwalk.push(obj.id()).unwrap();
+    //    revwalk.set_sorting(git2::Sort::TIME).unwrap();
+
+    //    // Create a set to store the commits and their messages
+    //    let mut commits = Vec::new();
+
+    //    // Iterate over the commits to find changed files
+    //    for oid in revwalk {
+    //        let oid = oid.unwrap();
+    //        let commit = repo.find_commit(oid).unwrap();
+
+    //        // Get the changed files
+    //        let tree = commit.tree().unwrap();
+    //        if commit.parent_count() != 0 {
+    //            // This follows only one parent
+    //            // TODO: iterate over parents properly
+    //            let parent = commit.parent(0).unwrap();
+    //            let parent_tree = parent.tree().unwrap();
+    //            let diff = repo
+    //                .diff_tree_to_tree(
+    //                    Some(&parent_tree),
+    //                    Some(&tree),
+    //                    Some(&mut git2::DiffOptions::new()),
+    //                )
+    //                .unwrap();
+
+    //            let mut changed_files = Vec::new();
+    //            diff.deltas().for_each(|delta| {
+    //                changed_files.push(
+    //                    delta
+    //                        .new_file()
+    //                        .path()
+    //                        .unwrap()
+    //                        .to_str()
+    //                        .unwrap()
+    //                        .to_string(),
+    //                );
+    //            });
+
+    //            // Add the commit and its message to the set
+    //            //commits.insert(changed_files);
+    //            commits.push(changed_files);
+    //        };
+    //    }
+    //    debug!("{:?}", commits);
+    //    // Add some staged files
+    //    let mut index = repo.index().unwrap();
+    //    std::fs::write(dir.join(Path::new("two")), "test writing").unwrap();
+    //    let _ = index.add_path(Path::new("two")); // File has to be relative to the repo to be
+    //                                              // committed
+    //    let _ = index.write(); // This effectively stages a file for commit
+    //                           //
+    //                           // will need to iterate over statuses with appropriate options
+    //                           // doc https://docs.rs/git2/latest/git2/struct.Repository.html#method.statuses
+
+    //    debug!("{:?}", get_staged_files(&repo));
+
+    //    // This is effectively a scratch, just die
+    //    panic!()
+    //}
+
+    #[test]
+    fn test_staged_files_as_expected() {
+        let dir = testdir!();
+        let repo = setup_repo_with_commits_and_files(
+            &dir,
+            &["init", "foo(foz): bar", "foo"], // commit msgs
+            &["init", "one", "two"],           // files
+        );
+        let edited_file_name = "somefile";
+        let edited_file = Path::new(edited_file_name);
+
+        // Test that none is returned when nothing is edited
+        assert_eq!(get_staged_files(&repo).unwrap(), None);
+
+        let mut index = repo.index().unwrap();
+        std::fs::write(dir.join(edited_file), "test writing").unwrap();
+
+        // Test that none is returned when nothing is staged
+        assert_eq!(get_staged_files(&repo).unwrap(), None);
+
+        let _ = index.add_path(edited_file); // File has to be relative to the repo to be committed
+        let _ = index.write();
+
+        debug!("{:?}", get_staged_files(&repo));
+
+        // Check that the edited file is returned
+        assert_eq!(
+            get_staged_files(&repo).unwrap(),
+            Some(HashSet::from([edited_file_name.to_string()]))
+        );
+    }
+
+    fn mk_set(s: impl IntoIterator<Item = impl AsRef<str>>) -> HashSet<String> {
+        HashSet::from_iter(s.into_iter().map(|s| s.as_ref().to_string()))
+    }
+    #[test]
+    fn get_get_changed_files_from_commit() {
+        let dir = testdir!();
+        let repo = setup_repo_with_commits_and_files(
+            &dir,
+            &["init", "foo(foz): bar", "foo", "bar"], // commit msgs
+            &["init", "one", "two", "two"],           // files
+        );
+
+        let reflog = repo.reflog("HEAD").unwrap();
+
+        // Implementation notes:
+        //
+        // 1. reflog starts with the HEAD and walks backwards
+        // 2. The order of changed files should match what's expected.
+        let test_res: Vec<HashSet<String>> = reflog
+            .iter()
+            .map(|x| get_changed_files_from_commit(&repo.find_commit(x.id_new()).unwrap(), &repo))
+            .collect();
+        let expected: Vec<HashSet<String>> = vec![
+            mk_set(["two"]),
+            mk_set(["two"]),
+            mk_set(["one"]),
+            HashSet::new(),
+        ];
+
+        assert_eq!(test_res, expected);
+    }
+
     /// Checks extraction of scope from commit message
     #[rstest]
     // Trivial case
@@ -28,5 +312,56 @@ mod tests {
             get_scope_from_commit_message(msg),
             expected.map(String::from)
         )
+    }
+
+    /// Naive test. Setup a repo with one change that has a scope and one file.
+    #[test]
+    fn test_get_scopes_x_files_simple() {
+        let dir = testdir!();
+        let repo = setup_repo_with_commits_and_files(
+            &dir,
+            &["init", "foo(foz): bar", "foo"], // commit msgs
+            &["init", "one", "two"],           // files
+        );
+
+        let res = get_scopes_x_changes(&repo).unwrap();
+
+        let expected: HashMap<UserProvidedCommitScope, ChangedFiles> = HashMap::from([(
+            UserProvidedCommitScope::new("foz".to_string()),
+            mk_set(["one"]),
+        )]);
+
+        assert_eq!(res, Some(expected));
+    }
+
+    #[test]
+    fn test_get_scopes_x_files_multiple_files_multiple_scopes() {
+        let dir = testdir!();
+        let repo = setup_repo_with_commits_and_files(
+            &dir,
+            &[
+                "init",
+                "foo(foz): bar",
+                "foo(foz): bar",
+                "foo(baz): bar",
+                "foo(baz): bar",
+            ], // commit msgs
+            &["init", "one", "two", "three", "two"], // files
+        );
+
+        let res = get_scopes_x_changes(&repo).unwrap();
+
+        let expected: HashMap<UserProvidedCommitScope, ChangedFiles> = HashMap::from([
+            (
+                UserProvidedCommitScope::new("foz".to_string()),
+                mk_set(["one", "two"]),
+            ),
+            (
+                UserProvidedCommitScope::new("baz".to_string()),
+                mk_set(["three", "two"]),
+            ),
+        ]);
+
+        assert_eq!(res, Some(expected));
     }
 }

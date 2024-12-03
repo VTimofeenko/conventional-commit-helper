@@ -1,5 +1,6 @@
 use anyhow::Result;
 use git2::Repository;
+use itertools::sorted;
 use log::debug;
 use std::path::{Path, PathBuf};
 
@@ -8,6 +9,11 @@ use crate::utils::{Config, UserProvidedCommitScope};
 mod commit;
 
 use commit::get_scope_from_commit_message;
+
+use self::commit::{get_scopes_x_changes, get_staged_files};
+use self::distance::find_closest_neighbor;
+
+mod distance;
 
 // Plan:
 // 1. Allow reading commit scopes from a file
@@ -36,8 +42,12 @@ where
             }
         };
 
+    let repo = Repository::discover(path)?;
+
     debug!("Looking for scopes in history");
-    let scopes_from_history = get_scopes_from_commit_history(&Repository::discover(path)?)?;
+    // This needs to return pairs (scope, { changed_files })
+    let scopes_from_history = get_scopes_x_changes(&repo)?;
+    // .map(|x| x.keys().cloned().collect::<Vec<UserProvidedCommitScope>>());
 
     // This can be written more concisely but I will trade it off for readability
     let res = match (scopes_from_config, scopes_from_history) {
@@ -49,11 +59,31 @@ where
         // One is Some() -- return it
         (Some(x), None) => {
             debug!("Found scopes only in config");
+            // There's no need to sort this, no scopes_from_history found
             Some(x)
         }
-        (None, Some(y)) => {
+        (None, Some(history_scopes)) => {
             debug!("Found scopes only in history");
-            Some(y)
+
+            let mut scopes =
+                sorted(history_scopes.keys().cloned()).collect::<Vec<UserProvidedCommitScope>>();
+
+            // check the current staged changes, push closest match to the front
+            if let Some(staged_files) = get_staged_files(&repo)? {
+                let matched_scope = find_closest_neighbor(staged_files, history_scopes);
+
+                match matched_scope {
+                    Some(matched_scope) => {
+                        debug!("Found a scope matching '{:?}'", matched_scope);
+                        scopes = push_to_first(scopes, matched_scope);
+                    }
+                    None => {
+                        debug!("No scope matches currently staged files");
+                    }
+                };
+            }
+
+            Some(scopes)
         }
         // Both are Some -- smart merge
         (Some(config_scopes), Some(history_scopes)) => {
@@ -62,7 +92,7 @@ where
             let known_scope_names: Vec<String> =
                 config_scopes.iter().map(|x| x.clone().name).collect();
             let filtered_scopes_from_commit_history = history_scopes
-                .iter()
+                .keys()
                 .filter(|x| !known_scope_names.contains(&x.name))
                 .cloned()
                 .collect();
@@ -70,6 +100,22 @@ where
             let mut scopes = [config_scopes, filtered_scopes_from_commit_history].concat();
             scopes.sort();
 
+            // Now, I can check the currently staged files and push the needed scope to the front.
+            if let Some(staged_files) = get_staged_files(&repo)? {
+                let matched_scope = find_closest_neighbor(staged_files, history_scopes);
+
+                match matched_scope {
+                    Some(matched_scope) => {
+                        debug!("Found a scope matching '{:?}'", matched_scope);
+                        scopes = push_to_first(scopes, matched_scope);
+                    }
+                    None => {
+                        debug!("No scope matches currently staged files");
+                    }
+                };
+            }
+
+            // check the current staged changes, push closest neighbor to the front
             Some(scopes)
         }
     };
@@ -120,6 +166,15 @@ fn get_scopes_from_commit_history(
     debug!("Found scopes in commit history: {:?}", res);
     // If result is empty -- None. Some(result) otherwise
     Ok((!res.is_empty()).then_some(res))
+}
+
+fn push_to_first<T: Ord>(mut v: Vec<T>, first: T) -> Vec<T> {
+    if let Some(index) = v.iter().position(|s| s == &first) {
+        v.remove(index);
+        v.insert(0, first);
+    }
+
+    v
 }
 
 #[cfg(test)]

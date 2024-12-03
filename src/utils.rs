@@ -10,13 +10,25 @@ use std::path::MAIN_SEPARATOR;
 use std::path::{Path, PathBuf};
 
 /// This is a generic printable thing. The concrete examples would be:
-#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Default, Deserialize, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct PrintableEntity<S>
 where
     S: Into<String>,
 {
     pub name: S,
     pub description: S,
+}
+
+impl<S> PrintableEntity<S>
+where
+    S: Into<String> + std::default::Default,
+{
+    pub fn new(name: S) -> Self {
+        PrintableEntity {
+            name,
+            ..Default::default()
+        }
+    }
 }
 
 impl<S> fmt::Display for PrintableEntity<S>
