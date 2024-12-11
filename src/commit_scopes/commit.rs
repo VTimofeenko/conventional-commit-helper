@@ -140,26 +140,33 @@ pub fn get_scopes_x_changes(
     // Walk through the repo using reflog?
     // For every commit, if there is a scope in the message -- get its diff and append to the
     // accumulator
-    let mut accumulator = HashMap::<UserProvidedCommitScope, ChangedFiles>::new();
+    // let mut accumulator = HashMap::<UserProvidedCommitScope, ChangedFiles>::new();
 
-    // TODO: reflog vs rewalk -- latter may expose commits as is without an extra lookup
-    repo.reflog("HEAD")?.iter().for_each(|reflog_entry| {
-        let commit = repo.find_commit(reflog_entry.id_new()).unwrap();
-        let scope =
-            get_scope_from_commit_message(commit.message().expect("Commit should have a message"));
-        if let Some(extracted_scope) = scope {
-            let scope_obj = UserProvidedCommitScope::new(extracted_scope);
-            let changed_files = get_changed_files_from_commit(&commit, repo);
+    let res = repo.reflog("HEAD")?.iter().fold(
+        HashMap::<UserProvidedCommitScope, ChangedFiles>::new(),
+        |mut acc, reflog_entry| {
+            // PERF: this looks like a potentially unneeded lookup. If performance starts to suffer --
+            // might be worth refactoring this
+            let commit = repo.find_commit(reflog_entry.id_new()).unwrap();
 
-            if let Some(existing_changed_files) = accumulator.get_mut(&scope_obj) {
-                existing_changed_files.extend(changed_files);
-            } else {
-                accumulator.insert(scope_obj, changed_files);
-            }
-        }
-    });
+            let scope = get_scope_from_commit_message(
+                commit.message().expect("Commit should have a message"),
+            );
+            if let Some(extracted_scope) = scope {
+                let scope_obj = UserProvidedCommitScope::new(extracted_scope);
+                let changed_files = get_changed_files_from_commit(&commit, repo);
 
-    Ok((!accumulator.is_empty()).then_some(accumulator))
+                if let Some(existing_changed_files) = acc.get_mut(&scope_obj) {
+                    existing_changed_files.extend(changed_files);
+                } else {
+                    acc.insert(scope_obj, changed_files);
+                }
+            };
+            acc
+        },
+    );
+
+    Ok((!res.is_empty()).then_some(res))
 }
 
 #[cfg(test)]
