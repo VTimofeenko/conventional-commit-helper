@@ -1,4 +1,5 @@
 use itertools::sorted;
+use log::debug;
 
 use crate::utils::UserProvidedCommitScope;
 
@@ -121,6 +122,7 @@ pub fn find_closest_neighbor(
     staged_files: ChangedFiles,
     scope_set: HashMap<UserProvidedCommitScope, ChangedFiles>,
 ) -> Option<UserProvidedCommitScope> {
+    debug!("Staged files: {:?}", staged_files);
     let res = find_by_overlap(staged_files, scope_set);
 
     sorted(res)
