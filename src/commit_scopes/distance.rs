@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
 use itertools::sorted;
 
 use crate::utils::UserProvidedCommitScope;
