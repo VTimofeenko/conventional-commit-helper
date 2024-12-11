@@ -92,7 +92,10 @@ pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
         .filter_map(|x| x.path().map(|p| p.to_string()))
         .collect();
 
-    // TODO: debug if no files changed
+    // debug if no files changed
+    if paths.is_empty() {
+        debug!("No files staged for commit");
+    };
     Ok((!paths.is_empty()).then_some(paths))
 }
 
