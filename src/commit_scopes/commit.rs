@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use anyhow::Result;
 use git2::{Commit, Repository};
+use itertools::any;
 use log::debug;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -74,7 +75,7 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
 ///
 /// No files staged -- return None
 pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
-    let paths: ChangedFiles = repo
+    let maybe_paths: HashSet<Option<String>> = repo
         .statuses(None)?
         .iter()
         // Filter only the staged things
@@ -88,9 +89,21 @@ pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
             )
         })
         // .path() may yield None on bad non-utf8 paths
-        // TODO: properly report this error
-        .filter_map(|x| x.path().map(|p| p.to_string()))
+        .map(|x| x.path().map(|p| p.to_string()))
         .collect();
+
+    // If any path is none:
+    // 1. Alert user
+    // 2. Exclude it from the result
+    //
+    // Alternative implementation would have used some .map creativity above, but looks like there
+    // is no "inspect_none"-like method that would capture all side effect demons in a
+    // non-returning bottle.
+    if any(&maybe_paths, |opt| opt.is_none()) {
+        debug!("Some paths appear to be non-utf8. These are ignored.");
+    };
+
+    let paths: ChangedFiles = maybe_paths.into_iter().flatten().collect();
 
     // debug if no files changed
     if paths.is_empty() {
