@@ -13,12 +13,6 @@ use self::distance::find_closest_neighbor;
 
 mod distance;
 
-// Plan:
-// 1. Allow reading commit scopes from a file
-// 2. Get commit scopes from git history
-// 3. Implement sorting
-// 4. Do the distance thing(?)
-
 /// The main entry point to retrieve commit scopes from a git repository at location
 /// This function should not panic.
 pub fn try_get_commit_scopes_from_repo_at_path<P>(
@@ -45,7 +39,6 @@ where
     debug!("Looking for scopes in history");
     // This needs to return pairs (scope, { changed_files })
     let scopes_from_history = get_scopes_x_changes(&repo)?;
-    // .map(|x| x.keys().cloned().collect::<Vec<UserProvidedCommitScope>>());
 
     // This can be written more concisely but I will trade it off for readability
     let res = match (scopes_from_config, scopes_from_history) {

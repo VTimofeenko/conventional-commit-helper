@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use anyhow::Result;
 use git2::{Commit, Repository};
 use itertools::any;
@@ -9,24 +8,6 @@ use std::collections::{HashMap, HashSet};
 use crate::utils::UserProvidedCommitScope;
 
 /// Things that deal with the repository go here
-/// The logic to extract scope x paths will be here. The logic to extract commit messages into
-/// scopes should also go here
-///
-///
-/// The plan
-///
-/// 1. ✓ Learn how to traverse commits back to the beginning
-/// 2. ✓ Learn how to get changes for commit
-/// 3. ✓ Move "extract scope" logic to this file
-/// 4. ✓ Construct scope x file changes mapping
-/// 5. ✓ Learn how to get staged files
-/// 6. ✓ Devicse some smart distance between staged files and sets of file changes to suggest the
-///    best matching scope
-/// 7. ✓ TODOs
-/// 8. No unwraps in non-test code
-/// 9. ???
-/// 10. PROFIT
-///
 
 // As a design decision, I am working with file names and not paths. The key point of this
 // structure is to be able to quickly compare two sets of changed files by names. As a first
@@ -35,6 +16,7 @@ use crate::utils::UserProvidedCommitScope;
 // If I want to switch over to subpath checking or whatever -- I should probably move this
 // structure to hashset of paths.
 pub type ChangedFiles = HashSet<String>;
+
 /// Returns the list of changed files
 ///
 /// Using hashset to explicitly denote that there is no order
@@ -87,8 +69,8 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
                     None => {
                         debug!("Cannot get the changed file path, probably it's not utf-8");
                         debug!("It will be ignored");
-                        return
-                    },
+                        return;
+                    }
                 };
                 res.insert(changed_file);
             });
@@ -174,7 +156,9 @@ pub fn get_scopes_x_changes(
         |mut acc, reflog_entry| {
             // PERF: this looks like a potentially unneeded lookup. If performance starts to suffer --
             // might be worth refactoring this
-            let commit = repo.find_commit(reflog_entry.id_new()).expect("This commit really should exist");
+            let commit = repo
+                .find_commit(reflog_entry.id_new())
+                .expect("This commit really should exist");
 
             let scope = get_scope_from_commit_message(
                 commit.message().expect("Commit should have a message"),

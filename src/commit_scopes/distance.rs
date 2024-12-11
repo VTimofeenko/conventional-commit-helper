@@ -16,8 +16,8 @@ use std::collections::{HashMap, HashSet};
 /// closest to the set of currently staged files set_1?
 ///
 /// The plan is:
-/// 1. Write closest match search naive implementation
-/// 2. Use code from here to actually guess the scope
+/// 1. ✓ Write closest match search naive implementation
+/// 2. ✓ Use code from here to actually guess the scope
 /// 3. Consider making the searc path-aware
 /// 4. Maybe generalize the algorithm to turn into a metric (see below)
 ///
