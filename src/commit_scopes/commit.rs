@@ -1,8 +1,8 @@
 use anyhow::Result;
+use fancy_regex::Regex;
 use git2::{Commit, Repository};
 use itertools::any;
 use log::debug;
-use regex::Regex;
 use std::collections::{HashMap, HashSet};
 
 use crate::utils::UserProvidedCommitScope;
@@ -122,23 +122,34 @@ pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
 
 /// Given a single commit message, tries to find a scope in it
 fn get_scope_from_commit_message(message: &str) -> Option<String> {
-    // Typically scopes are found in the brackets:
-    // refactor(conventional-commit-helper): Change CommitType -> PrintableEntity to make it more generic
-    let re = Regex::new(r"\(([^)]*)\)").unwrap();
-    let mat = re.find(message);
     // LATER: maybe only show this for very verbose output
     debug!("Checking git commit message {:?}", message);
+    // Typically scopes are found in the brackets:
+    // refactor(conventional-commit-helper): Change CommitType -> PrintableEntity to make it more generic
 
-    mat.map(|arg0: regex::Match<'_>| {
-        // Return the string, except for first and last chars which are brackets
-        // This should be faster than capture groups
-        // Rust regex does not have look(around|behind)
-        let res = regex::Match::as_str(&arg0);
-        let result = res[1..res.len() - 1].to_string();
+    // The regex has:
+    //     r"\w+",         // commit type, "MUST"
+    //     r"\((\w+)\)??", // commit scope, what we're looking for, "OPTIONAL"
+    //                     // ungreedy, capture group
+    //     r"?!", // "breaking" change excalamation point, "OPTIONAL"
+    //     r": ", // terminal colon and space, "REQUIRED"
+    //     r".*", // the rest is boring
+    //
+    // Implementation note:  using fancy regex as it seems to align with my prior knowledge of
+    // regexes more.
+    // Frankly, the capture group is unnecessary -- this can be solved by a lookaround
+    let regex = Regex::new(r"^\w+\(([\w ]+)\)!?: .*").unwrap();
 
-        debug!("Found: {:?}", result);
-        result
-    })
+    regex
+        .captures(message)
+        .unwrap_or(None) // ignore an error, just return None
+        .map(|x| {
+            x.get(1)
+                .inspect(|y| debug!("Found {:?}", y))
+                .unwrap()
+                .as_str()
+                .to_string()
+        })
 }
 
 pub fn get_scopes_x_changes(
@@ -160,6 +171,7 @@ pub fn get_scopes_x_changes(
                 .find_commit(reflog_entry.id_new())
                 .expect("This commit really should exist");
 
+            debug!("Checking commit OID {:?}", commit.id());
             let scope = get_scope_from_commit_message(
                 commit.summary().expect("Commit should have a message"),
             );
@@ -260,6 +272,8 @@ mod tests {
     #[case::present_multiple_words("foo(foz baz): bar", Some("foz baz"))]
     // Check that only first occurrence is parsed
     #[case::present_multiple_times("foo(bar): baz (foz)", Some("bar"))]
+    // Check that random sequence in brackets is not found
+    #[case::present_multiple_times("foo baz (foz)", None)]
     // Check that "no scope" is handled correctly
     #[case::absent("foo: baz", None)]
     fn can_extract_scope_from_commit_msg(#[case] msg: &str, #[case] expected: Option<&str>) {
