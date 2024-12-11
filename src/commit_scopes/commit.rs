@@ -41,28 +41,55 @@ pub type ChangedFiles = HashSet<String>;
 fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedFiles {
     let mut res = HashSet::new(); // Accumulator object
 
-    let tree = commit.tree().unwrap();
+    let this_commit_tree = match commit.tree() {
+        Ok(x) => x,
+        Err(e) => {
+            debug!("Cannot get the {:?} commit's tree.", commit.id());
+            debug!("Error: {:?}", e);
+            debug!("Returning no changes");
+            return res;
+        }
+    };
 
     // no parents <=> initial commit?
     if commit.parent_count() != 0 {
         for parent in commit.parents() {
-            let parent_tree = parent.tree().unwrap();
-            let diff = repo
-                .diff_tree_to_tree(
-                    Some(&parent_tree),
-                    Some(&tree),
-                    Some(&mut git2::DiffOptions::new()),
-                )
-                .unwrap();
+            let parent_tree = match parent.tree() {
+                Ok(t) => t,
+                Err(e) => {
+                    debug!("Cannot find a tree for the parent {:?}", parent.id());
+                    debug!("Error: {:?}", e);
+                    debug!("Skipping the parent");
+                    continue;
+                }
+            };
+            let diff = match repo.diff_tree_to_tree(
+                Some(&parent_tree),
+                Some(&this_commit_tree),
+                Some(&mut git2::DiffOptions::new()),
+            ) {
+                Ok(x) => x,
+                Err(e) => {
+                    debug!(
+                        "Cannot find diff from {:?} to {:?}",
+                        parent_tree.id(),
+                        this_commit_tree.id()
+                    );
+                    debug!("Error: {:?}", e);
+                    debug!("Skipping parent");
+                    continue;
+                }
+            };
 
             diff.deltas().for_each(|delta| {
-                let changed_file = delta
-                    .new_file()
-                    .path()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string();
+                let changed_file = match delta.new_file().path().and_then(|p| p.to_str()) {
+                    Some(path) => path.to_string(),
+                    None => {
+                        debug!("Cannot get the changed file path, probably it's not utf-8");
+                        debug!("It will be ignored");
+                        return
+                    },
+                };
                 res.insert(changed_file);
             });
         }
@@ -147,7 +174,7 @@ pub fn get_scopes_x_changes(
         |mut acc, reflog_entry| {
             // PERF: this looks like a potentially unneeded lookup. If performance starts to suffer --
             // might be worth refactoring this
-            let commit = repo.find_commit(reflog_entry.id_new()).unwrap();
+            let commit = repo.find_commit(reflog_entry.id_new()).expect("This commit really should exist");
 
             let scope = get_scope_from_commit_message(
                 commit.message().expect("Commit should have a message"),
