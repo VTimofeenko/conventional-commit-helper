@@ -121,7 +121,7 @@ pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
 }
 
 /// Given a single commit message, tries to find a scope in it
-pub fn get_scope_from_commit_message(message: &str) -> Option<String> {
+fn get_scope_from_commit_message(message: &str) -> Option<String> {
     // Typically scopes are found in the brackets:
     // refactor(conventional-commit-helper): Change CommitType -> PrintableEntity to make it more generic
     let re = Regex::new(r"\(([^)]*)\)").unwrap();
