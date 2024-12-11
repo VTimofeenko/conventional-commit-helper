@@ -140,18 +140,12 @@ mod test {
 
     #[fixture]
     fn needle() -> UserProvidedCommitScope {
-        UserProvidedCommitScope {
-            name: "needle".to_string(),
-            description: "".to_string(),
-        }
+        UserProvidedCommitScope::new("needle".to_string())
     }
 
     #[fixture]
     fn cruft() -> UserProvidedCommitScope {
-        UserProvidedCommitScope {
-            name: "cruft".to_string(),
-            description: "".to_string(),
-        }
+        UserProvidedCommitScope::new("cruft".to_string())
     }
 
     /// Test exactly equal search result is found in a trivial case
