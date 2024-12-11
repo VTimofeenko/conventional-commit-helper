@@ -20,9 +20,13 @@
         { pkgs, ... }:
         let
           craneLib = inputs.crane.mkLib pkgs;
+          pkg = craneLib.buildPackage { src = craneLib.cleanCargoSource ./.; };
         in
         {
-          packages.default = craneLib.buildPackage { src = craneLib.cleanCargoSource ./.; };
+          checks = {
+            inherit pkg;
+          };
+          packages.default = pkg;
           devShells.default = craneLib.devShell {
             packages = [ pkgs.mdsh ];
           };
