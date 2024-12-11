@@ -161,7 +161,7 @@ pub fn get_scopes_x_changes(
                 .expect("This commit really should exist");
 
             let scope = get_scope_from_commit_message(
-                commit.message().expect("Commit should have a message"),
+                commit.summary().expect("Commit should have a message"),
             );
             if let Some(extracted_scope) = scope {
                 let scope_obj = UserProvidedCommitScope::new(extracted_scope);
