@@ -128,28 +128,26 @@ fn get_scope_from_commit_message(message: &str) -> Option<String> {
     // refactor(conventional-commit-helper): Change CommitType -> PrintableEntity to make it more generic
 
     // The regex has:
-    //     r"\w+",         // commit type, "MUST"
-    //     r"\((\w+)\)??", // commit scope, what we're looking for, "OPTIONAL"
-    //                     // ungreedy, capture group
-    //     r"?!", // "breaking" change excalamation point, "OPTIONAL"
-    //     r": ", // terminal colon and space, "REQUIRED"
-    //     r".*", // the rest is boring
+    //
+    // 1. Lookbehind: search for an opening bracket
+    // 2. Match any alphanum+space
+    // 3. Until a closing bracket is encountered with (optionally) exclamation point (for breaking
+    //    changes) and a colon
     //
     // Implementation note:  using fancy regex as it seems to align with my prior knowledge of
-    // regexes more.
-    // Frankly, the capture group is unnecessary -- this can be solved by a lookaround
-    let regex = Regex::new(r"^\w+\(([\w ]+)\)!?: .*").unwrap();
+    // regexes more and it supports lookarounds
+    //
+    // Digging the match from a capture group seems excessive
+    let regex = Regex::new(r"(?<=\()[\w ]+(?=\)!?:)").unwrap();
 
     regex
-        .captures(message)
-        .unwrap_or(None) // ignore an error, just return None
-        .map(|x| {
-            x.get(1)
-                .inspect(|y| debug!("Found {:?}", y))
-                .unwrap()
-                .as_str()
-                .to_string()
+        .find(message)
+        .unwrap_or_else(|e| {
+            debug!("Error: {:?}", e);
+            debug!("Returning None");
+            None
         })
+        .map(|m| m.as_str().to_string())
 }
 
 pub fn get_scopes_x_changes(
