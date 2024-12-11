@@ -8,8 +8,6 @@ use crate::utils::{Config, UserProvidedCommitScope};
 
 mod commit;
 
-use commit::get_scope_from_commit_message;
-
 use self::commit::{get_scopes_x_changes, get_staged_files};
 use self::distance::find_closest_neighbor;
 
@@ -123,51 +121,6 @@ where
     Ok(res)
 }
 
-/// Retrieves matches of scopes from the git history
-fn get_scopes_from_commit_history(
-    repo: &git2::Repository,
-) -> Result<Option<Vec<UserProvidedCommitScope>>> {
-    let reflog = repo.reflog("HEAD")?;
-
-    let res: Vec<UserProvidedCommitScope> = reflog
-        .iter()
-        .filter_map(|entry| -> Option<String> {
-            // Just getting an entry.message won't work
-            // Messages seem to contain an action and some other stuff
-            // which would be pretty hard to parse
-            //
-            // Alternative approach that is slower(?) but more sound:
-            // Get the new OID, locate the commit, find its message.
-            let new_id = entry.id_new();
-            debug!("Looking for commit {:?}", new_id);
-            let target_commit: git2::Commit = repo
-                .find_commit(new_id)
-                // TODO: this panics
-                .expect(
-                    "Cannot find commit that should exist. This is probably a bug, see debug log.",
-                );
-
-            target_commit
-                .message()
-                // Leave None in place (so filter_map removes these)
-                // If not None -- apply get_scope_from_commit_message
-                .map_or_else(|| None, get_scope_from_commit_message)
-        })
-        // dedup by turning it into a hashset
-        .collect::<std::collections::HashSet<String>>()
-        .iter()
-        // Turn into needed structs
-        .map(|x| UserProvidedCommitScope {
-            name: x.to_string(),
-            description: "".to_string(),
-        })
-        .collect();
-
-    debug!("Found scopes in commit history: {:?}", res);
-    // If result is empty -- None. Some(result) otherwise
-    Ok((!res.is_empty()).then_some(res))
-}
-
 fn push_to_first<T: Ord>(mut v: Vec<T>, first: T) -> Vec<T> {
     if let Some(index) = v.iter().position(|s| s == &first) {
         v.remove(index);
@@ -208,21 +161,6 @@ mod tests {
             .expect("There should be something returned here");
         assert_eq!(res.len(), 1);
         assert_eq!(res.first().unwrap().name, "foz");
-    }
-
-    /// Setup a repo with commits, check that scopes can be extracted from history
-    #[rstest]
-    fn get_from_repo_history() {
-        let dir = testdir!();
-        let repo = setup_repo_with_commits(&dir, &["init", "foo(foz): bar"]);
-
-        let res =
-            get_scopes_from_commit_history(&repo).expect("There should be something returned here");
-
-        debug!("{:?}", res);
-
-        assert_eq!(res.clone().unwrap().len(), 1);
-        assert_eq!(res.unwrap().first().unwrap().name, "foz");
     }
 
     /// Ensure that if a scope is present in both history and config -- the one from the config
