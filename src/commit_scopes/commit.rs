@@ -117,7 +117,7 @@ pub fn get_scope_from_commit_message(message: &str) -> Option<String> {
     // refactor(conventional-commit-helper): Change CommitType -> PrintableEntity to make it more generic
     let re = Regex::new(r"\(([^)]*)\)").unwrap();
     let mat = re.find(message);
-    // TODO: maybe only show this for very verbose output
+    // LATER: maybe only show this for very verbose output
     debug!("Checking git commit message {:?}", message);
 
     mat.map(|arg0: regex::Match<'_>| {
