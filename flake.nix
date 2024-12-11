@@ -23,7 +23,9 @@
         in
         {
           packages.default = craneLib.buildPackage { src = craneLib.cleanCargoSource ./.; };
-          devShells.default = craneLib.devShell { };
+          devShells.default = craneLib.devShell {
+            packages = [ pkgs.mdsh ];
+          };
         };
     };
 }
