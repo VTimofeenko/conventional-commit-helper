@@ -20,7 +20,7 @@
         { pkgs, ... }:
         let
           craneLib = inputs.crane.mkLib pkgs;
-          pkg = craneLib.buildPackage { src = craneLib.cleanCargoSource ./.; };
+          pkg = craneLib.buildPackage { src = craneLib.cleanCargoSource ./.; meta.mainProgram = "conventional-commit-helper"; };
         in
         {
           checks = {
