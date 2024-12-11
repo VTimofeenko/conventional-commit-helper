@@ -45,28 +45,27 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
 
     // no parents <=> initial commit?
     if commit.parent_count() != 0 {
-        // This follows only one parent
-        // TODO: iterate over parents properly
-        let parent = commit.parent(0).unwrap();
-        let parent_tree = parent.tree().unwrap();
-        let diff = repo
-            .diff_tree_to_tree(
-                Some(&parent_tree),
-                Some(&tree),
-                Some(&mut git2::DiffOptions::new()),
-            )
-            .unwrap();
+        for parent in commit.parents() {
+            let parent_tree = parent.tree().unwrap();
+            let diff = repo
+                .diff_tree_to_tree(
+                    Some(&parent_tree),
+                    Some(&tree),
+                    Some(&mut git2::DiffOptions::new()),
+                )
+                .unwrap();
 
-        diff.deltas().for_each(|delta| {
-            let changed_file = delta
-                .new_file()
-                .path()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string();
-            res.insert(changed_file);
-        });
+            diff.deltas().for_each(|delta| {
+                let changed_file = delta
+                    .new_file()
+                    .path()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+                res.insert(changed_file);
+            });
+        }
     };
     res
 }
