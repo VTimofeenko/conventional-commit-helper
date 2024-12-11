@@ -22,7 +22,7 @@ use crate::utils::UserProvidedCommitScope;
 /// 5. ✓ Learn how to get staged files
 /// 6. ✓ Devicse some smart distance between staged files and sets of file changes to suggest the
 ///    best matching scope
-/// 7. TODOs
+/// 7. ✓ TODOs
 /// 8. No unwraps in non-test code
 /// 9. ???
 /// 10. PROFIT
