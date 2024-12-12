@@ -158,7 +158,6 @@ pub fn get_scopes_x_changes(
     // Walk through the repo using reflog?
     // For every commit, if there is a scope in the message -- get its diff and append to the
     // accumulator
-    // let mut accumulator = HashMap::<UserProvidedCommitScope, ChangedFiles>::new();
 
     let mut revwalk = repo.revwalk()?;
     // Set the walk from the HEAD
