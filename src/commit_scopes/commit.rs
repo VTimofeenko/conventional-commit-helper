@@ -160,29 +160,47 @@ pub fn get_scopes_x_changes(
     // accumulator
     // let mut accumulator = HashMap::<UserProvidedCommitScope, ChangedFiles>::new();
 
-    let res = repo.reflog("HEAD")?.iter().fold(
+    let mut revwalk = repo.revwalk()?;
+    // Set the walk from the HEAD
+    revwalk.push_head()?;
+
+    let res = revwalk.fold(
+        // let res = repo.revwalk()?.push_head().iter().fold(
         HashMap::<UserProvidedCommitScope, ChangedFiles>::new(),
-        |mut acc, reflog_entry| {
-            // PERF: this looks like a potentially unneeded lookup. If performance starts to suffer --
-            // might be worth refactoring this
-            let commit = repo
-                .find_commit(reflog_entry.id_new())
-                .expect("This commit really should exist");
+        |mut acc, revwalk_entry| {
+            match revwalk_entry {
+                Ok(oid) => {
+                    // Record the scope and the changed files in the accumulator.
+                    // If scope does not exist -- insert it
+                    // If it exists -- append the changed files to the set
 
-            debug!("Checking commit OID {:?}", commit.id());
-            let scope = get_scope_from_commit_message(
-                commit.summary().expect("Commit should have a message"),
-            );
-            if let Some(extracted_scope) = scope {
-                let scope_obj = UserProvidedCommitScope::new(extracted_scope);
-                let changed_files = get_changed_files_from_commit(&commit, repo);
+                    // PERF: this looks like a potentially unneeded lookup. If performance starts to suffer --
+                    // might be worth refactoring this
+                    let commit = repo
+                        .find_commit(oid)
+                        .expect("This commit really should exist");
 
-                if let Some(existing_changed_files) = acc.get_mut(&scope_obj) {
-                    existing_changed_files.extend(changed_files);
-                } else {
-                    acc.insert(scope_obj, changed_files);
+                    debug!("Checking commit OID {:?}", commit.id());
+                    let scope = get_scope_from_commit_message(
+                        commit.summary().expect("Commit should have a message"),
+                    );
+                    if let Some(extracted_scope) = scope {
+                        let scope_obj = UserProvidedCommitScope::new(extracted_scope);
+                        let changed_files = get_changed_files_from_commit(&commit, repo);
+
+                        if let Some(existing_changed_files) = acc.get_mut(&scope_obj) {
+                            existing_changed_files.extend(changed_files);
+                        } else {
+                            acc.insert(scope_obj, changed_files);
+                        }
+                    };
                 }
-            };
+                Err(e) => {
+                    debug!("Encountered error {:?}", e);
+                    // Short circuit back
+                }
+            }
+
             acc
         },
     );
