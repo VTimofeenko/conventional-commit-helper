@@ -138,7 +138,7 @@ fn get_scope_from_commit_message(message: &str) -> Option<String> {
     // regexes more and it supports lookarounds
     //
     // Digging the match from a capture group seems excessive
-    let regex = Regex::new(r"(?<=\()[\w ]+(?=\)!?:)").unwrap();
+    let regex = Regex::new(r"(?<=\()[\w -]+(?=\)!?:)").unwrap();
 
     regex
         .find(message)
