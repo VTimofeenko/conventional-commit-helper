@@ -85,7 +85,7 @@ pub use PrintableEntity as CommitScope;
 pub type UserProvidedCommitScope = CommitScope<String>;
 
 pub const DEFAULT_CONFIG_PATH_IN_REPO: &str =
-    formatcp!(".dev{}conventional-commit-helper.json", MAIN_SEPARATOR);
+    formatcp!(".dev{}conventional-commit-helper.toml", MAIN_SEPARATOR);
 
 /// Holds the runtime configuration
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]

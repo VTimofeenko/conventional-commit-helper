@@ -98,7 +98,7 @@ pub mod test_utils {
 
     pub fn setup_config_file_in_path(tmpdir: &Path, content: &str) -> PathBuf {
         debug!("Setting up config file at {:?}", tmpdir);
-        let config_path = tmpdir.join(".dev/conventional-commit-helper.json");
+        let config_path = tmpdir.join(".dev/conventional-commit-helper.toml");
         let _ = fs::create_dir_all(config_path.parent().unwrap());
         fs::write(&config_path, content).unwrap();
 
