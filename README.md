@@ -51,7 +51,20 @@ TODO
 
 # Configuration
 
-TODO
+This program searches per-repo configuration file under
+`.dev/conventional-commit-helper.toml`:
+
+```toml
+[scopes]
+# key/value pairs
+foo = "bar"
+
+[types]
+# Only these types will be suggested
+# key/value pairs
+feat = "Some custom description for feat type"
+fix = "Some custom description for fix type"
+```
 
 [1]: https://www.conventionalcommits.org/en/v1.0.0/
 [2]: https://wiki.nixos.org/wiki/Flakes
