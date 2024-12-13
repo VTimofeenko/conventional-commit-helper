@@ -8,7 +8,7 @@ Generate [conventional commits][1] message from a CLI
     * From config
     * Compare staged files to ones that changed in the past in the same scope
 * Per-repo configuration of scopes/types
-* Composable with other tools (TODO: lazygit example)
+* Composable with other tools ([examples](./docs/SAMPLE.md))
 
 # Usage
 
