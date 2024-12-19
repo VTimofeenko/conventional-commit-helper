@@ -1,6 +1,6 @@
 use anyhow::Result;
 use fancy_regex::Regex;
-use git2::{Commit, Repository};
+use git2::{Commit, Repository, Status};
 use itertools::any;
 use log::debug;
 use std::collections::{HashMap, HashSet};
@@ -83,19 +83,20 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
 ///
 /// No files staged -- return None
 pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
+    let needed_statuses = [
+        Status::INDEX_NEW,                            // new staged files
+        Status::INDEX_MODIFIED,                       // files fully staged for commit
+        Status::INDEX_DELETED,                        // removed files
+        Status::INDEX_RENAMED,                        // renamed files
+        Status::INDEX_MODIFIED | Status::WT_MODIFIED, // files partially staged for commit
+        Status::INDEX_NEW | Status::WT_MODIFIED,
+    ];
+
     let maybe_paths: HashSet<Option<String>> = repo
         .statuses(None)?
         .iter()
         // Filter only the staged things
-        .filter(|x| {
-            matches!(
-                x.status(),
-                git2::Status::INDEX_NEW
-                    | git2::Status::INDEX_MODIFIED
-                    | git2::Status::INDEX_DELETED
-                    | git2::Status::INDEX_RENAMED
-            )
-        })
+        .filter(|x| needed_statuses.contains(&x.status()))
         // .path() may yield None on bad non-utf8 paths
         .map(|x| x.path().map(|p| p.to_string()))
         .collect();
@@ -212,39 +213,62 @@ mod tests {
     use super::*;
     use conventional_commit_helper::test_utils::setup_repo_with_commits_and_files;
     use rstest::rstest;
+    use std::fs::OpenOptions;
+    use std::io::Write;
     use std::path::Path;
     use testdir::testdir;
 
-    #[test]
-    fn test_staged_files_as_expected() {
+    #[rstest]
+    // Trivial case: nothing staged => nothing returned
+    #[case::nothing(None, None, None)]
+    // A new file is added and fully staged
+    #[case::new_file_stage_full(Some(true), Some("newfile"), Some("newfile"))]
+    // A new file is added and partially staged
+    #[case::new_file_stage_partial(Some(false), Some("newfile"), Some("newfile"))]
+    // An existing file is edited and fully staged
+    #[case::edit_file_stage_full(Some(true), Some("existingfile"), Some("existingfile"))]
+    // An existing file is edited and partially staged
+    #[case::edit_file_stage_partial(Some(false), Some("existingfile"), Some("existingfile"))]
+    fn test_staged_files_as_expected(
+        #[case] stage_full_file: Option<bool>,
+        #[case] filename: Option<&str>,
+        #[case] expected: Option<&str>,
+    ) {
+        // Common setup
         let dir = testdir!();
         let repo = setup_repo_with_commits_and_files(
             &dir,
             &["init", "foo(foz): bar", "foo"], // commit msgs
             &["init", "one", "two"],           // files
         );
-        let edited_file_name = "somefile";
-        let edited_file = Path::new(edited_file_name);
+        // On None -- just do nothing
+        if let Some(edited_file) = filename {
+            let edited_file = Path::new(edited_file);
 
-        // Test that none is returned when nothing is edited
-        assert_eq!(get_staged_files(&repo).unwrap(), None);
+            let mut file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(dir.join(edited_file))
+                .unwrap();
+            let _ = file.write(b"first line");
 
-        let mut index = repo.index().unwrap();
-        std::fs::write(dir.join(edited_file), "test writing").unwrap();
+            let mut index = repo.index().unwrap();
+            assert_eq!(get_staged_files(&repo).unwrap(), None); // Edited but not staged => nothing returned
 
-        // Test that none is returned when nothing is staged
-        assert_eq!(get_staged_files(&repo).unwrap(), None);
+            // Now stage the file
+            let _ = index.add_path(edited_file); // File has to be relative to the repo to be committed
+            let _ = index.write();
 
-        let _ = index.add_path(edited_file); // File has to be relative to the repo to be committed
-        let _ = index.write();
+            if stage_full_file == Some(false) {
+                // Write more into the file if stage_full_file is false
+                let _ = file.write(b"second line line");
+            }
+        };
 
-        debug!("{:?}", get_staged_files(&repo));
+        // Adjust `expected` to match what get_staged_files returns
+        let expected = expected.map(|s| HashSet::from([s.to_string()]));
 
-        // Check that the edited file is returned
-        assert_eq!(
-            get_staged_files(&repo).unwrap(),
-            Some(HashSet::from([edited_file_name.to_string()]))
-        );
+        assert_eq!(get_staged_files(&repo).unwrap(), expected);
     }
 
     fn mk_set(s: impl IntoIterator<Item = impl AsRef<str>>) -> HashSet<String> {
