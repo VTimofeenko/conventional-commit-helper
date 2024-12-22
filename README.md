@@ -10,6 +10,20 @@ Generate [conventional commits][1] message from a CLI
 * Per-repo configuration of scopes/types
 * Composable with other tools ([examples](./docs/SAMPLE.md))
 
+# Limitations/roadmap
+
+- Scopes: no way to disable scope search in history (to be done)
+- Scopes: no way to hide scopes from suggestions (to be done)
+- Scopes: search through history is done every time, so the performance will be
+  slow on long git histories with lots of changes and commits (to be improved
+  through caching)
+- Configuration: no global config file (to be done)
+- Configuration: no support for alternative config location, so the config needs to be
+  checked in (to be done)
+- Distribution: only accessible through nix (will not be done unless someone
+  actually needs this)
+- Scopes: Scopes are checked only for the current branch (most likely will not be done)
+
 # Usage
 
 <!-- ```$ as shell
