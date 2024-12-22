@@ -3,7 +3,7 @@ name: "Nix flake check"
 "on":
   push:
     branches:
-      - main
+      - master
 
 jobs:
   nix-flake-check:
