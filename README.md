@@ -1,12 +1,13 @@
-Generate [conventional commits][1] message from a CLI
+Generate [conventional commits][1] subject from a CLI.
 
 # Features
 
 * Commit types (feat/fix/etc.) suggestion
 * Commit scope suggestion:
     * From git history
-    * From config
-    * Compare staged files to ones that changed in the past in the same scope
+    * From configuration file
+    * If the staged files look like they match a scope from history — that scope
+      will be suggested
 * Per-repo configuration of scopes/types
 * Composable with other tools ([examples](./docs/SAMPLE.md))
 
