@@ -60,10 +60,6 @@ nix run github:VTimofeenko/conventional-commit-helper
 
 The default package can be added to a Nix system configuration.
 
-## Cargo
-
-TODO
-
 # Configuration
 
 This program searches per-repo configuration file under
