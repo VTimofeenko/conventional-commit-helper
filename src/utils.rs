@@ -159,6 +159,10 @@ impl Config {
         Self::try_config_file_in_repo(repo)
     }
 
+    pub fn try_from_repo(repo: &Repository) -> Result<Option<Self>> {
+        Self::from_file(&repo.workdir().unwrap().join(DEFAULT_CONFIG_PATH_IN_REPO))
+    }
+
     fn try_config_file_in_repo(repo: Repository) -> Result<Option<Self>> {
         if repo.is_bare() {
             bail!("Repository is bare, should not search for a config there.")

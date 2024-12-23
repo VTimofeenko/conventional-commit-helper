@@ -58,7 +58,7 @@ fn main() -> anyhow::Result<()> {
 
     let output: Vec<PrintableEntity<String>> = match args.mode {
         Some(x) => match x {
-            Mode::Type => commit_types::get_commit_types_from_repo_or_default(args.repo_path)?,
+            Mode::Type => commit_types::get_commit_types_from_repo_or_default(&repo)?,
             // Handle "no custom scopes", provide fallback value
             Mode::Scope => commit_scopes::try_get_commit_scopes_from_repo_at_path(args.repo_path)?
                 .unwrap_or_else(Vec::new),
