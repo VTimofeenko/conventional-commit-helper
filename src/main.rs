@@ -3,7 +3,7 @@ use log::debug;
 use std::path::PathBuf;
 
 use self::commit_types::get_default_commit_types;
-use self::utils::PrintableEntity;
+use self::utils::{repo_from_path, validate_repo, PrintableEntity};
 
 mod commit_scopes;
 mod commit_types;
@@ -51,6 +51,10 @@ fn main() -> anyhow::Result<()> {
 
         debug!("Launched with args: {:?}", args);
     }
+
+    let repo = repo_from_path(&args.repo_path)?;
+
+    validate_repo(&repo)?;
 
     let output: Vec<PrintableEntity<String>> = match args.mode {
         Some(x) => match x {

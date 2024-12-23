@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use const_format::formatcp;
 use core::fmt;
 use git2::Repository;
@@ -214,6 +214,24 @@ pub const DEFAULT_COMMIT_TYPES: &[BundledCommitType] = &[
         description: "Adding missing tests or correcting existing tests",
     },
 ];
+
+/// Takes a path, returns a repository containing that path.
+pub fn repo_from_path(path_in_repo: &Path) -> Result<Repository> {
+    let repo = Repository::discover(path_in_repo).context("Failed to discover a repository")?;
+
+    match repo.is_bare() {
+        true => bail!("Bare repositories are not supported"),
+        false => Ok(repo),
+    }
+}
+
+pub fn validate_repo(repo: &Repository) -> Result<()> {
+    if repo.is_bare() {
+        bail!("Bare repositories are not supported");
+    };
+
+    Ok(())
+}
 
 #[cfg(test)]
 mod test {
