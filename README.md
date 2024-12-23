@@ -19,8 +19,8 @@ Generate [conventional commits][1] subject from a CLI.
   slow on long git histories with lots of changes and commits (to be improved
   through caching)
 - Configuration: no global config file (to be done)
-- Configuration: no support for alternative config location, so the config needs to be
-  checked in (to be done)
+- Configuration: no support for alternative config location, so the config needs
+  to be checked in or added to gitignore/exclude (to be done)
 - Distribution: only accessible through nix (will not be done unless someone
   actually needs this)
 - Scopes: Scopes are checked only for the current branch (most likely will not be done)
