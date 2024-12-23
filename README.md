@@ -24,6 +24,7 @@ Generate [conventional commits][1] subject from a CLI.
 - Distribution: only accessible through nix (will not be done unless someone
   actually needs this)
 - Scopes: Scopes are checked only for the current branch (most likely will not be done)
+- General: bare repositories are not supported (most likely will not be done)
 
 # Usage
 
