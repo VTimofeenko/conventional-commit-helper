@@ -1,8 +1,6 @@
 use anyhow::Result;
 use git2::Repository;
 use log::debug;
-// use std::fs::File;
-// use std::io::BufReader;
 
 use crate::config::Config;
 use crate::utils::{CommitType, UserProvidedCommitType, DEFAULT_COMMIT_TYPES};
