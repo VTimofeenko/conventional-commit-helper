@@ -4,7 +4,8 @@ use log::debug;
 // use std::fs::File;
 // use std::io::BufReader;
 
-use crate::utils::{CommitType, Config, UserProvidedCommitType, DEFAULT_COMMIT_TYPES};
+use crate::config::Config;
+use crate::utils::{CommitType, UserProvidedCommitType, DEFAULT_COMMIT_TYPES};
 
 fn try_get_commit_types_from_repo(
     repo: &Repository,

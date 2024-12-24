@@ -3,7 +3,8 @@ use git2::Repository;
 use itertools::sorted;
 use log::debug;
 
-use crate::utils::{Config, UserProvidedCommitScope};
+use crate::config::Config;
+use crate::utils::UserProvidedCommitScope;
 
 mod commit;
 

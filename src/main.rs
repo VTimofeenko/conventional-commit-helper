@@ -7,6 +7,7 @@ use self::utils::{repo_from_path, validate_repo, PrintableEntity};
 
 mod commit_scopes;
 mod commit_types;
+mod config;
 mod utils;
 
 #[derive(ValueEnum, Clone, Debug)]
