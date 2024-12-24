@@ -2,12 +2,11 @@ use anyhow::{bail, Context, Result};
 use const_format::formatcp;
 use core::fmt;
 use git2::Repository;
-use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::path::Path;
 use std::path::MAIN_SEPARATOR;
-use std::path::{Path, PathBuf};
 
 /// This is a generic printable thing. The concrete examples would be:
 #[derive(Debug, Default, Deserialize, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
@@ -134,40 +133,7 @@ impl Config {
         }
     }
 
-    pub fn from_repo_at_path<P>(path: &P) -> Result<Option<Self>>
-    where
-        P: Into<PathBuf> + AsRef<Path> + std::fmt::Debug,
-    {
-        // Try to find repo at location.
-        debug!("Looking for a repo at {:?}", path);
-
-        let repo: Repository = match Repository::discover(path) {
-            Ok(x) => x,
-            Err(err) => match err.code() {
-                // No repo -- OK, don't need to search it
-                git2::ErrorCode::NotFound => {
-                    debug!("No repo found at location");
-                    return Ok(None);
-                }
-                // Return any other error
-                _ => bail!(err),
-            },
-        };
-
-        debug!("Repo found, checking for config file");
-
-        Self::try_config_file_in_repo(repo)
-    }
-
     pub fn try_from_repo(repo: &Repository) -> Result<Option<Self>> {
-        Self::from_file(&repo.workdir().unwrap().join(DEFAULT_CONFIG_PATH_IN_REPO))
-    }
-
-    fn try_config_file_in_repo(repo: Repository) -> Result<Option<Self>> {
-        if repo.is_bare() {
-            bail!("Repository is bare, should not search for a config there.")
-        }
-
         Self::from_file(&repo.workdir().unwrap().join(DEFAULT_CONFIG_PATH_IN_REPO))
     }
 }

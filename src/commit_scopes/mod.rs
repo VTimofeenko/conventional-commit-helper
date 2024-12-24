@@ -2,7 +2,6 @@ use anyhow::Result;
 use git2::Repository;
 use itertools::sorted;
 use log::debug;
-use std::path::{Path, PathBuf};
 
 use crate::utils::{Config, UserProvidedCommitScope};
 
@@ -15,15 +14,12 @@ mod distance;
 
 /// The main entry point to retrieve commit scopes from a git repository at location
 /// This function should not panic.
-pub fn try_get_commit_scopes_from_repo_at_path<P>(
-    path: P,
-) -> Result<Option<Vec<UserProvidedCommitScope>>>
-where
-    P: Into<PathBuf> + AsRef<Path> + std::fmt::Debug,
-{
+pub fn try_get_commit_scopes_from_repo(
+    repo: &Repository,
+) -> Result<Option<Vec<UserProvidedCommitScope>>> {
     debug!("Looking for scopes in config");
     let scopes_from_config: Option<Vec<UserProvidedCommitScope>> =
-        match Config::from_repo_at_path(&path)? {
+        match Config::try_from_repo(&repo)? {
             Some(config) => {
                 debug!("Found config in repo, returning its commit_scopes");
                 config.commit_scopes
@@ -33,8 +29,6 @@ where
                 None
             }
         };
-
-    let repo = Repository::discover(path)?;
 
     debug!("Looking for scopes in history");
     // This needs to return pairs (scope, { changed_files })
@@ -146,10 +140,10 @@ mod tests {
     #[rstest]
     fn get_from_repo(mk_scopes: String) {
         let dir = testdir!();
-        let _ = setup_repo_with_commits(&dir, &["init"]);
+        let repo = setup_repo_with_commits(&dir, &["init"]);
         setup_config_file_in_path(&dir, &mk_scopes);
 
-        let res = try_get_commit_scopes_from_repo_at_path(&dir)
+        let res = try_get_commit_scopes_from_repo(&repo)
             .unwrap()
             .expect("There should be something returned here");
         assert_eq!(res.len(), 1);
@@ -163,10 +157,10 @@ mod tests {
     #[rstest]
     fn check_merge() {
         let dir = testdir!();
-        let _ = setup_repo_with_commits(&dir, &["init", "foo(foz): bar"]);
+        let repo = setup_repo_with_commits(&dir, &["init", "foo(foz): bar"]);
         mk_config_with_scopes_only(&dir);
 
-        let res = try_get_commit_scopes_from_repo_at_path(&dir)
+        let res = try_get_commit_scopes_from_repo(&repo)
             .unwrap()
             .expect("There should be something returned here");
 
