@@ -80,14 +80,14 @@ pub struct Cache {
 
 impl Cache {
     /// Returns None if cache does not exist
-    pub fn load() -> Result<Option<Self>> {
+    pub fn load() -> Result<Self> {
         let cache_path = get_cache_path()?;
         if cache_path.exists() {
             let data = std::fs::read(cache_path)?;
             let cache: Cache = bincode::deserialize(&data)?;
-            Ok(Some(cache))
+            Ok(cache)
         } else {
-            Ok(None)
+            bail!("Cache does not exist")
         }
     }
 
@@ -177,7 +177,7 @@ pub fn update_cache_for_repo(repo: &Repository) -> Result<()> {
     Cache::lock()?;
 
     // Load the cache
-    let mut cache = Cache::load()?.unwrap();
+    let mut cache = Cache::load()?;
 
     debug!("Getting scopes x changes from the repo");
     let scopes_changes = get_scopes_x_changes(repo)?;
@@ -210,7 +210,7 @@ pub fn drop_cache_for_repo(repo: &Repository) -> Result<()> {
     Cache::lock()?;
 
     // Load the cache
-    let mut cache = Cache::load()?.unwrap();
+    let mut cache = Cache::load()?;
 
     // If the entry exists, drop it from cache.
     match cache.entries.remove(&repo_id) {

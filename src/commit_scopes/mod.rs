@@ -41,16 +41,7 @@ pub fn try_get_commit_scopes_from_repo(
     // 3. Cache loaded OK and has entry for current repo -- use that entry
     let scopes_from_cache: Option<HashMap<UserProvidedCommitScope, ChangedFiles>> =
         match Cache::load() {
-            Ok(x) => match x {
-                Some(cache) => {
-                    debug!("Loading scopes from cache");
-                    cache.get_scopes_for_repo(repo)
-                }
-                None => {
-                    debug!("Cache does not exist");
-                    None
-                }
-            },
+            Ok(cache) => cache.get_scopes_for_repo(repo),
             Err(e) => {
                 debug!("Cache could not be loaded because of {:?}", e);
                 None
