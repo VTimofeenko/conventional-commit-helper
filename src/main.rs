@@ -1,4 +1,4 @@
-use clap::{ArgAction, Parser, ValueEnum};
+use clap::{ArgAction, Parser, Subcommand};
 use log::debug;
 use std::path::PathBuf;
 
@@ -10,35 +10,70 @@ mod commit_types;
 mod config;
 mod utils;
 
-#[derive(ValueEnum, Clone, Debug)]
-enum Mode {
-    Type,
-    Scope,
+#[derive(Subcommand, Debug)]
+enum CacheCommand {
+    /// Creates the cache for a repo
+    Create,
+    /// Updates the cache for a repo
+    Update,
+    /// Drops cache for a repo
+    Drop,
+    /// Delete the whole cache
+    Nuke,
+}
+
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Cache operations
+    Cache {
+        #[command(subcommand)]
+        command: CacheCommand,
+    },
+    /// Show commit types
+    Type {
+        /// Print output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show commit scopes
+    Scope {
+        /// Print output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// Tiny helper for conventional commits (https://www.conventionalcommits.org).
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /////Mode in which the program runs
-    #[clap(value_enum, default_value=None)]
-    mode: Option<Mode>,
-
-    /// Print output in JSON format
-    #[arg(long)]
-    json: bool,
-
     /// Path to the non-bare git repository.
     #[arg(long, default_value = ".")]
     repo_path: PathBuf,
 
+    /// Enable debug logging
     #[arg(long, action=ArgAction::SetTrue)]
     debug: bool,
-    // /// Path to the file containing conventional commit types for the repository.
-    // ///
-    // /// Can be specified as relative to the repo workdir root (default value)
-    // #[arg(long, default_value = ".dev/commit-types.json")]
-    // commit_types_file: PathBuf,
+
+    /// Command to execute
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+fn default_print<S>(output: Vec<PrintableEntity<S>>)
+where
+    S: std::fmt::Display,
+    std::string::String: std::convert::From<S>,
+{
+    output.iter().for_each(|x| println!("{}", x))
+}
+
+fn json_print<S>(output: Vec<PrintableEntity<S>>)
+where
+    S: serde::Serialize,
+    std::string::String: std::convert::From<S>,
+{
+    println!("{}", serde_json::to_string(&output).unwrap())
 }
 
 fn main() -> anyhow::Result<()> {
@@ -53,27 +88,57 @@ fn main() -> anyhow::Result<()> {
         debug!("Launched with args: {:?}", args);
     }
 
+    // Handle no given command. This should be done first so nothing is really validated.
+    let Some(command) = args.command else {
+        debug!("Running in default mode, just printing the types");
+        default_print(get_default_commit_types());
+        return Ok(());
+    };
+
+    debug!("Running '{:?}'", command);
+
     let repo = repo_from_path(&args.repo_path)?;
 
     validate_repo(&repo)?;
-
-    let output: Vec<PrintableEntity<String>> = match args.mode {
-        Some(x) => match x {
-            Mode::Type => commit_types::get_commit_types_from_repo_or_default(&repo)?,
-            // Handle "no custom scopes", provide fallback value
-            Mode::Scope => {
-                commit_scopes::try_get_commit_scopes_from_repo(&repo)?.unwrap_or_else(Vec::new)
+    match command {
+        Command::Cache { command } => match command {
+            CacheCommand::Create => {
+                todo!()
+                // cache::create_cache_for_repo()?;
+                // debug!("Populating the cache for the repo");
+                // cache::update_cache_for_repo(&repo)?
+            }
+            CacheCommand::Update => {
+                todo!()
+                // cache::update_cache_for_repo(&repo)?
+            }
+            CacheCommand::Drop => {
+                todo!()
+                //cache::drop_cache_for_repo(&repo)?
+            }
+            CacheCommand::Nuke => {
+                todo!()
+                // cache::nuke_cache()?
             }
         },
-        None => {
-            debug!("No modes passed as an arg, running default action");
-            get_default_commit_types()
+        Command::Type { json } => {
+            let output = commit_types::get_commit_types_from_repo_or_default(&repo)?;
+
+            match json {
+                true => json_print(output),
+                false => default_print(output),
+            }
+        }
+        Command::Scope { json } => {
+            let output =
+                commit_scopes::try_get_commit_scopes_from_repo(&repo)?.unwrap_or_else(Vec::new);
+
+            match json {
+                true => json_print(output),
+                false => default_print(output),
+            }
         }
     };
 
-    match args.json {
-        true => println!("{}", serde_json::to_string(&output).unwrap()),
-        false => output.iter().for_each(|x| println!("{}", x)),
-    }
     Ok(())
 }
