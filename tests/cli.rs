@@ -152,6 +152,70 @@ fn valid_scope_is_suggested() {
     cmd_scopes.assert().stdout(starts_with("z_bar"));
 }
 
+/// This test validates basic cache manipulations. It does not look into the cache itself.
+#[test]
+fn cache_ops() {
+    init_logger();
+
+    // Set up environment
+    let dir = assert_fs::TempDir::new().unwrap();
+    let repo_path = dir.path().join("repo");
+    let cache_path = dir
+        .path()
+        .join("conventional-commit-helper/commit_scope_cache.bin");
+    let _repo = setup_repo_with_commits_and_files(
+        &repo_path,
+        &["init", "foo(z_bar): quux", "foo(baz): quux"],
+        &["init", "one", "two"],
+    );
+
+    Command::cargo_bin(BIN_NAME)
+        .unwrap()
+        .env("XDG_CACHE_HOME", dir.path())
+        .arg("--debug")
+        .arg("cache")
+        .arg("create")
+        .assert();
+
+    // Check that cache exists
+    assert!(cache_path.exists());
+
+    Command::cargo_bin(BIN_NAME)
+        .unwrap()
+        .env("XDG_CACHE_HOME", dir.path())
+        .arg("--debug")
+        .arg("--repo-path")
+        .arg(&repo_path)
+        .arg("cache")
+        .arg("update")
+        .assert();
+
+    Command::cargo_bin(BIN_NAME)
+        .unwrap()
+        .env("XDG_CACHE_HOME", dir.path())
+        .arg("--debug")
+        .arg("--repo-path")
+        .arg(&repo_path)
+        .arg("cache")
+        .arg("drop")
+        .assert();
+
+    // Check that cache still exists
+    assert!(cache_path.exists());
+    Command::cargo_bin(BIN_NAME)
+        .unwrap()
+        .env("XDG_CACHE_HOME", dir.path())
+        .arg("--debug")
+        .arg("--repo-path")
+        .arg(repo_path)
+        .arg("cache")
+        .arg("nuke")
+        .assert();
+
+    // Check that cache is gone
+    assert!(!cache_path.exists());
+}
+
 // Ensure logger is initialized only once for all tests
 static INIT: Once = Once::new();
 

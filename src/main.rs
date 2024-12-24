@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use self::commit_types::get_default_commit_types;
 use self::utils::{repo_from_path, validate_repo, PrintableEntity};
 
+mod cache;
 mod commit_scopes;
 mod commit_types;
 mod config;
@@ -103,23 +104,15 @@ fn main() -> anyhow::Result<()> {
     match command {
         Command::Cache { command } => match command {
             CacheCommand::Create => {
-                todo!()
-                // cache::create_cache_for_repo()?;
-                // debug!("Populating the cache for the repo");
-                // cache::update_cache_for_repo(&repo)?
+                cache::create_cache()?;
+                debug!("Populating the cache for the repo after cache creation");
+                cache::update_cache_for_repo(&repo)?
             }
-            CacheCommand::Update => {
-                todo!()
-                // cache::update_cache_for_repo(&repo)?
-            }
-            CacheCommand::Drop => {
-                todo!()
-                //cache::drop_cache_for_repo(&repo)?
-            }
-            CacheCommand::Nuke => {
-                todo!()
-                // cache::nuke_cache()?
-            }
+            CacheCommand::Update => cache::update_cache_for_repo(&repo)?,
+
+            CacheCommand::Drop => cache::drop_cache_for_repo(&repo)?,
+
+            CacheCommand::Nuke => cache::nuke_cache()?,
         },
         Command::Type { json } => {
             let output = commit_types::get_commit_types_from_repo_or_default(&repo)?;

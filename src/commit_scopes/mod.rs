@@ -6,7 +6,7 @@ use log::debug;
 use crate::config::Config;
 use crate::utils::UserProvidedCommitScope;
 
-mod commit;
+pub mod commit;
 
 use self::commit::{get_scopes_x_changes, get_staged_files};
 use self::distance::find_closest_neighbor;
