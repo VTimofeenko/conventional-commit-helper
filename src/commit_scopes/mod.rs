@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use git2::Repository;
 use itertools::sorted;
-use log::debug;
+use log::{debug, warn};
 
 use crate::cache::Cache;
 use crate::config::Config;
@@ -49,6 +49,7 @@ pub fn try_get_commit_scopes_from_repo(
         };
 
     let other_scopes = scopes_from_cache.or_else(|| {
+        warn!("Git history scope lookups are a bit slow. Consider using the cache (see --help)");
         debug!("Falling back to searching scopes in history");
         get_scopes_x_changes(repo).unwrap_or(None)
     });
