@@ -113,6 +113,15 @@ impl Cache {
             entries: HashMap::new(),
         }
     }
+
+    pub fn get_scopes_for_repo(
+        &self,
+        repo: &Repository,
+    ) -> Option<HashMap<UserProvidedCommitScope, ChangedFiles>> {
+        self.entries
+            .get(&get_repo_id(repo))
+            .map(|x| x.scopes.clone())
+    }
 }
 
 const CACHE_FILE: &str = "commit_scope_cache.bin";

@@ -1,14 +1,17 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use git2::Repository;
 use itertools::sorted;
 use log::debug;
 
+use crate::cache::Cache;
 use crate::config::Config;
 use crate::utils::UserProvidedCommitScope;
 
 pub mod commit;
 
-use self::commit::{get_scopes_x_changes, get_staged_files};
+use self::commit::{get_scopes_x_changes, get_staged_files, ChangedFiles};
 use self::distance::find_closest_neighbor;
 
 mod distance;
@@ -31,12 +34,36 @@ pub fn try_get_commit_scopes_from_repo(
             }
         };
 
-    debug!("Looking for scopes in history");
-    // This needs to return pairs (scope, { changed_files })
-    let scopes_from_history = get_scopes_x_changes(repo)?;
+    // Look up scopes for the repo in the cache
+    // Possible options:
+    // 1. Cache failed to load/does not exist -- log error and fall back to history
+    // 2. Cache loaded OK but does not have entry for current repo -- log and fall back
+    // 3. Cache loaded OK and has entry for current repo -- use that entry
+    let scopes_from_cache: Option<HashMap<UserProvidedCommitScope, ChangedFiles>> =
+        match Cache::load() {
+            Ok(x) => match x {
+                Some(cache) => {
+                    debug!("Loading scopes from cache");
+                    cache.get_scopes_for_repo(repo)
+                }
+                None => {
+                    debug!("Cache does not exist");
+                    None
+                }
+            },
+            Err(e) => {
+                debug!("Cache could not be loaded because of {:?}", e);
+                None
+            }
+        };
+
+    let other_scopes = scopes_from_cache.or_else(|| {
+        debug!("Falling back to searching scopes in history");
+        get_scopes_x_changes(repo).unwrap_or(None)
+    });
 
     // This can be written more concisely but I will trade it off for readability
-    let res = match (scopes_from_config, scopes_from_history) {
+    let res = match (scopes_from_config, other_scopes) {
         // Both are none -- return none
         (None, None) => {
             debug!("No scopes found in config or history");
@@ -49,7 +76,7 @@ pub fn try_get_commit_scopes_from_repo(
             Some(x)
         }
         (None, Some(history_scopes)) => {
-            debug!("Found scopes only in history");
+            debug!("Found scopes only in history or cache");
 
             let mut scopes =
                 sorted(history_scopes.keys().cloned()).collect::<Vec<UserProvidedCommitScope>>();
