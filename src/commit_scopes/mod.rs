@@ -20,7 +20,7 @@ pub fn try_get_commit_scopes_from_repo(
 ) -> Result<Option<Vec<UserProvidedCommitScope>>> {
     debug!("Looking for scopes in config");
     let scopes_from_config: Option<Vec<UserProvidedCommitScope>> =
-        match Config::try_from_repo(&repo)? {
+        match Config::try_from_repo(repo)? {
             Some(config) => {
                 debug!("Found config in repo, returning its commit_scopes");
                 config.commit_scopes
@@ -33,7 +33,7 @@ pub fn try_get_commit_scopes_from_repo(
 
     debug!("Looking for scopes in history");
     // This needs to return pairs (scope, { changed_files })
-    let scopes_from_history = get_scopes_x_changes(&repo)?;
+    let scopes_from_history = get_scopes_x_changes(repo)?;
 
     // This can be written more concisely but I will trade it off for readability
     let res = match (scopes_from_config, scopes_from_history) {
@@ -55,7 +55,7 @@ pub fn try_get_commit_scopes_from_repo(
                 sorted(history_scopes.keys().cloned()).collect::<Vec<UserProvidedCommitScope>>();
 
             // check the current staged changes, push closest match to the front
-            if let Some(staged_files) = get_staged_files(&repo)? {
+            if let Some(staged_files) = get_staged_files(repo)? {
                 let matched_scope = find_closest_neighbor(staged_files, history_scopes);
 
                 match matched_scope {
@@ -87,7 +87,7 @@ pub fn try_get_commit_scopes_from_repo(
             scopes.sort();
 
             // Now, I can check the currently staged files and push the needed scope to the front.
-            if let Some(staged_files) = get_staged_files(&repo)? {
+            if let Some(staged_files) = get_staged_files(repo)? {
                 let matched_scope = find_closest_neighbor(staged_files, history_scopes);
 
                 match matched_scope {
