@@ -173,6 +173,8 @@ fn cache_ops() {
         .unwrap()
         .env("XDG_CACHE_HOME", dir.path())
         .arg("--debug")
+        .arg("--repo-path")
+        .arg(&repo_path)
         .arg("cache")
         .arg("create")
         .assert();
