@@ -7,7 +7,8 @@ Generate [conventional commits][1] subject from a CLI.
     * From git history
     * From configuration file
     * If the staged files look like they match a scope from history — that scope
-      will be suggested
+      will be suggested (can be cached, see `cache` commands)
+
 * Per-repo configuration of scopes/types
 * Composable with other tools ([examples](./docs/SAMPLE.md))
 
@@ -15,9 +16,6 @@ Generate [conventional commits][1] subject from a CLI.
 
 - Scopes: no way to disable scope search in history (to be done)
 - Scopes: no way to hide scopes from suggestions (to be done)
-- Scopes: search through history is done every time, so the performance will be
-  slow on long git histories with lots of changes and commits (to be improved
-  through caching)
 - Configuration: no global config file (to be done)
 - Configuration: no support for alternative config location, so the config needs
   to be checked in or added to gitignore/exclude (to be done)
