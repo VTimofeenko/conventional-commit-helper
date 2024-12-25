@@ -177,7 +177,8 @@ fn cache_ops() {
         .arg(&repo_path)
         .arg("cache")
         .arg("create")
-        .assert();
+        .assert()
+        .success();
 
     // Check that cache exists
     assert!(cache_path.exists());
@@ -190,7 +191,8 @@ fn cache_ops() {
         .arg(&repo_path)
         .arg("cache")
         .arg("update")
-        .assert();
+        .assert()
+        .success();
 
     Command::cargo_bin(BIN_NAME)
         .unwrap()
@@ -200,7 +202,8 @@ fn cache_ops() {
         .arg(&repo_path)
         .arg("cache")
         .arg("drop")
-        .assert();
+        .assert()
+        .success();
 
     // Check that cache still exists
     assert!(cache_path.exists());
@@ -212,7 +215,8 @@ fn cache_ops() {
         .arg(repo_path)
         .arg("cache")
         .arg("nuke")
-        .assert();
+        .assert()
+        .success();
 
     // Check that cache is gone
     assert!(!cache_path.exists());
