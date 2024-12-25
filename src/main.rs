@@ -1,4 +1,5 @@
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{Parser, Subcommand};
+use clap_verbosity_flag::Verbosity;
 use log::debug;
 use std::path::PathBuf;
 
@@ -52,9 +53,8 @@ struct Args {
     #[arg(long, default_value = ".")]
     repo_path: PathBuf,
 
-    /// Enable debug logging
-    #[arg(long, action=ArgAction::SetTrue)]
-    debug: bool,
+    #[command(flatten)]
+    verbose: Verbosity,
 
     /// Command to execute
     #[command(subcommand)]
@@ -80,14 +80,11 @@ where
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    if args.debug {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Debug)
-            .format_timestamp_millis() // ms needed for perf troubleshooting
-            .init();
+    env_logger::Builder::new()
+        .filter_level(args.verbose.log_level_filter())
+        .init();
 
-        debug!("Launched with args: {:?}", args);
-    }
+    debug!("Launched with args: {:?}", args);
 
     // Handle no given command. This should be done first so nothing is really validated.
     let Some(command) = args.command else {

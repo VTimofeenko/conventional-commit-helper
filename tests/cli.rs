@@ -35,7 +35,7 @@ fn check_custom_repo_with_config() {
 
     // Setup command
     let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
-    cmd.arg("--debug");
+    cmd.arg("-vvv");
     cmd.arg("type");
     // Change CWD to the fake repo
     cmd.current_dir(dir.path());
@@ -58,7 +58,7 @@ fn check_custom_repo_with_config_and_scopes() {
 
     // Setup command
     let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
-    cmd.arg("--debug");
+    cmd.arg("-vvv");
     cmd.arg("scope");
     // Change CWD to the fake repo
     cmd.current_dir(dir.path());
@@ -85,7 +85,7 @@ fn all_together_now() {
     // Test types
     // Setup command
     let mut cmd_types = Command::cargo_bin(BIN_NAME).unwrap();
-    cmd_types.arg("--debug");
+    cmd_types.arg("-vvv");
     cmd_types.arg("type");
     // Change CWD to the fake repo
     cmd_types.current_dir(dir.path());
@@ -99,7 +99,7 @@ fn all_together_now() {
     // Test scopes
     // Setup command
     let mut cmd_scopes = Command::cargo_bin(BIN_NAME).unwrap();
-    cmd_scopes.arg("--debug");
+    cmd_scopes.arg("-vvv");
     cmd_scopes.arg("scope");
     // Change CWD to the fake repo
     cmd_scopes.current_dir(dir.path());
@@ -131,7 +131,7 @@ fn valid_scope_is_suggested() {
     // Test scopes
     // Setup command
     let mut cmd_scopes = Command::cargo_bin(BIN_NAME).unwrap();
-    cmd_scopes.arg("--debug");
+    cmd_scopes.arg("-vvv");
     cmd_scopes.arg("scope");
     // Change CWD to the fake repo
     cmd_scopes.current_dir(dir.path());
@@ -172,7 +172,7 @@ fn cache_ops() {
     Command::cargo_bin(BIN_NAME)
         .unwrap()
         .env("XDG_CACHE_HOME", dir.path())
-        .arg("--debug")
+        .arg("-vvv")
         .arg("--repo-path")
         .arg(&repo_path)
         .arg("cache")
@@ -186,7 +186,7 @@ fn cache_ops() {
     Command::cargo_bin(BIN_NAME)
         .unwrap()
         .env("XDG_CACHE_HOME", dir.path())
-        .arg("--debug")
+        .arg("-vvv")
         .arg("--repo-path")
         .arg(&repo_path)
         .arg("cache")
@@ -197,7 +197,7 @@ fn cache_ops() {
     Command::cargo_bin(BIN_NAME)
         .unwrap()
         .env("XDG_CACHE_HOME", dir.path())
-        .arg("--debug")
+        .arg("-vvv")
         .arg("--repo-path")
         .arg(&repo_path)
         .arg("cache")
@@ -210,7 +210,7 @@ fn cache_ops() {
     Command::cargo_bin(BIN_NAME)
         .unwrap()
         .env("XDG_CACHE_HOME", dir.path())
-        .arg("--debug")
+        .arg("-vvv")
         .arg("--repo-path")
         .arg(repo_path)
         .arg("cache")

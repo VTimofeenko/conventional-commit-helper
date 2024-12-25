@@ -43,7 +43,8 @@ Commands:
 
 Options:
       --repo-path <REPO_PATH>  Path to the non-bare git repository [default: .]
-      --debug                  Enable debug logging
+  -v, --verbose...             Increase logging verbosity
+  -q, --quiet...               Decrease logging verbosity
   -h, --help                   Print help
   -V, --version                Print version
 ```
