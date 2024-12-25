@@ -1,6 +1,6 @@
 use anyhow::Result;
 use git2::Repository;
-use log::debug;
+use log::info;
 
 use crate::config::Config;
 use crate::utils::{CommitType, UserProvidedCommitType, DEFAULT_COMMIT_TYPES};
@@ -10,11 +10,11 @@ fn try_get_commit_types_from_repo(
 ) -> Result<Option<Vec<UserProvidedCommitType>>> {
     match Config::try_from_repo(repo)? {
         Some(config) => {
-            debug!("Found config in repo, returning its commit_types");
+            info!("Found config in repo, returning its commit_types");
             Ok(config.commit_types)
         }
         None => {
-            debug!("No user-defined commit types found");
+            info!("No user-defined commit types found");
             Ok(None)
         }
     }
@@ -23,11 +23,11 @@ fn try_get_commit_types_from_repo(
 pub fn get_commit_types_from_repo_or_default(repo: &Repository) -> Result<Vec<CommitType<String>>> {
     match try_get_commit_types_from_repo(repo)? {
         Some(x) => {
-            debug!("Found custom commit types, returning them");
+            info!("Found custom commit types, returning them");
             Ok(x)
         }
         None => {
-            debug!("No custom commit types found, returning default");
+            info!("No custom commit types found, returning default");
             Ok(get_default_commit_types())
         }
     }

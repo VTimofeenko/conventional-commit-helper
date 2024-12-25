@@ -52,7 +52,7 @@
 use anyhow::{bail, Context, Result};
 use directories::ProjectDirs;
 use git2::Repository;
-use log::debug;
+use log::{debug, trace};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -92,7 +92,7 @@ impl Cache {
     }
 
     pub fn lock() -> Result<()> {
-        debug!("Acquiring lock on the cache");
+        trace!("Acquiring lock on the cache");
         let cache_path = get_cache_path()?;
         let options = file_lock::FileOptions::new().write(true).create(true);
         let _ = file_lock::FileLock::lock(&cache_path, false, options)
@@ -133,7 +133,7 @@ fn get_cache_path() -> Result<PathBuf> {
     if let Some(proj_dirs) = ProjectDirs::from("com", "vtimofeenko", "conventional-commit-helper") {
         let cache_dir = proj_dirs.cache_dir();
         let res = cache_dir.join(CACHE_FILE);
-        debug!("Cache path: '{:?}'", res);
+        trace!("Cache path: '{:?}'", res);
         Ok(res)
     } else {
         bail!("Unable to get cache directory from XDG")

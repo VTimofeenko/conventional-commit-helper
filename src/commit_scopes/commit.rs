@@ -2,7 +2,7 @@ use anyhow::Result;
 use fancy_regex::Regex;
 use git2::{Commit, Repository, Status};
 use itertools::any;
-use log::debug;
+use log::{info, trace, warn};
 use std::collections::{HashMap, HashSet};
 
 use crate::utils::UserProvidedCommitScope;
@@ -26,9 +26,9 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
     let this_commit_tree = match commit.tree() {
         Ok(x) => x,
         Err(e) => {
-            debug!("Cannot get the {:?} commit's tree.", commit.id());
-            debug!("Error: {:?}", e);
-            debug!("Returning no changes");
+            warn!("Cannot get the {:?} commit's tree.", commit.id());
+            warn!("Error: {:?}", e);
+            warn!("Returning no changes");
             return res;
         }
     };
@@ -39,9 +39,9 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
             let parent_tree = match parent.tree() {
                 Ok(t) => t,
                 Err(e) => {
-                    debug!("Cannot find a tree for the parent {:?}", parent.id());
-                    debug!("Error: {:?}", e);
-                    debug!("Skipping the parent");
+                    warn!("Cannot find a tree for the parent {:?}", parent.id());
+                    warn!("Error: {:?}", e);
+                    warn!("Skipping the parent");
                     continue;
                 }
             };
@@ -52,13 +52,13 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
             ) {
                 Ok(x) => x,
                 Err(e) => {
-                    debug!(
+                    warn!(
                         "Cannot find diff from {:?} to {:?}",
                         parent_tree.id(),
                         this_commit_tree.id()
                     );
-                    debug!("Error: {:?}", e);
-                    debug!("Skipping parent");
+                    warn!("Error: {:?}", e);
+                    warn!("Skipping parent");
                     continue;
                 }
             };
@@ -67,8 +67,8 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
                 let changed_file = match delta.new_file().path().and_then(|p| p.to_str()) {
                     Some(path) => path.to_string(),
                     None => {
-                        debug!("Cannot get the changed file path, probably it's not utf-8");
-                        debug!("It will be ignored");
+                        warn!("Cannot get the changed file path, probably it's not utf-8");
+                        warn!("It will be ignored");
                         return;
                     }
                 };
@@ -109,22 +109,20 @@ pub fn get_staged_files(repo: &Repository) -> Result<Option<ChangedFiles>> {
     // is no "inspect_none"-like method that would capture all side effect demons in a
     // non-returning bottle.
     if any(&maybe_paths, |opt| opt.is_none()) {
-        debug!("Some paths appear to be non-utf8. These are ignored.");
+        info!("Some paths appear to be non-utf8. These are ignored.");
     };
 
     let paths: ChangedFiles = maybe_paths.into_iter().flatten().collect();
 
-    // debug if no files changed
     if paths.is_empty() {
-        debug!("No files staged for commit");
+        info!("No files staged for commit");
     };
     Ok((!paths.is_empty()).then_some(paths))
 }
 
 /// Given a single commit message, tries to find a scope in it
 fn get_scope_from_commit_message(message: &str) -> Option<String> {
-    // LATER: maybe only show this for very verbose output
-    debug!("Checking git commit message {:?}", message);
+    trace!("Checking git commit message {:?}", message);
     // Typically scopes are found in the brackets:
     // refactor(conventional-commit-helper): Change CommitType -> PrintableEntity to make it more generic
 
@@ -144,8 +142,8 @@ fn get_scope_from_commit_message(message: &str) -> Option<String> {
     regex
         .find(message)
         .unwrap_or_else(|e| {
-            debug!("Error: {:?}", e);
-            debug!("Returning None");
+            warn!("Error: {:?}", e);
+            warn!("Returning None");
             None
         })
         .map(|m| m.as_str().to_string())
@@ -180,7 +178,7 @@ pub fn get_scopes_x_changes(
                         .find_commit(oid)
                         .expect("This commit really should exist");
 
-                    debug!("Checking commit OID {:?}", commit.id());
+                    trace!("Checking commit OID {:?}", commit.id());
                     let scope = get_scope_from_commit_message(
                         commit.summary().expect("Commit should have a message"),
                     );
@@ -196,7 +194,7 @@ pub fn get_scopes_x_changes(
                     };
                 }
                 Err(e) => {
-                    debug!("Encountered error {:?}", e);
+                    warn!("Encountered error {:?}", e);
                     // Short circuit back
                 }
             }

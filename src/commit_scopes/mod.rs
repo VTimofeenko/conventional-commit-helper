@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use git2::Repository;
 use itertools::sorted;
-use log::{debug, warn};
+use log::{debug, info, warn};
 
 use crate::cache::Cache;
 use crate::config::Config;
@@ -25,11 +25,11 @@ pub fn try_get_commit_scopes_from_repo(
     let scopes_from_config: Option<Vec<UserProvidedCommitScope>> =
         match Config::try_from_repo(repo)? {
             Some(config) => {
-                debug!("Found config in repo, returning its commit_scopes");
+                info!("Found config in repo, returning its commit_scopes");
                 config.commit_scopes
             }
             None => {
-                debug!("No user-defined commit scopes found");
+                info!("No user-defined commit scopes found");
                 None
             }
         };
@@ -43,14 +43,14 @@ pub fn try_get_commit_scopes_from_repo(
         match Cache::load() {
             Ok(cache) => cache.get_scopes_for_repo(repo),
             Err(e) => {
-                debug!("Cache could not be loaded because of {:?}", e);
+                warn!("Cache could not be loaded because of {:?}", e);
                 None
             }
         };
 
     let other_scopes = scopes_from_cache.or_else(|| {
         warn!("Git history scope lookups are a bit slow. Consider using the cache (see --help)");
-        debug!("Falling back to searching scopes in history");
+        info!("Falling back to searching scopes in history");
         get_scopes_x_changes(repo).unwrap_or(None)
     });
 
@@ -58,12 +58,12 @@ pub fn try_get_commit_scopes_from_repo(
     let res = match (scopes_from_config, other_scopes) {
         // Both are none -- return none
         (None, None) => {
-            debug!("No scopes found in config or history");
+            info!("No scopes found in config or history");
             None
         }
         // One is Some() -- return it
         (Some(x), None) => {
-            debug!("Found scopes only in config");
+            info!("Found scopes only in config");
             // There's no need to sort this, no scopes_from_history found
             Some(x)
         }
@@ -79,11 +79,11 @@ pub fn try_get_commit_scopes_from_repo(
 
                 match matched_scope {
                     Some(matched_scope) => {
-                        debug!("Found a scope matching '{:?}'", matched_scope);
+                        info!("Found a scope matching '{:?}'", matched_scope);
                         scopes = push_to_first(scopes, matched_scope);
                     }
                     None => {
-                        debug!("No scope matches currently staged files");
+                        info!("No scope matches currently staged files");
                     }
                 };
             }
@@ -92,7 +92,7 @@ pub fn try_get_commit_scopes_from_repo(
         }
         // Both are Some -- smart merge
         (Some(config_scopes), Some(history_scopes)) => {
-            debug!("Found scopes in both history and config");
+            info!("Found scopes in both history and config");
             debug!("Merging the scopes from git history with the project-specific ones. Project-specific ones win.");
             let known_scope_names: Vec<String> =
                 config_scopes.iter().map(|x| x.clone().name).collect();
@@ -111,11 +111,11 @@ pub fn try_get_commit_scopes_from_repo(
 
                 match matched_scope {
                     Some(matched_scope) => {
-                        debug!("Found a scope matching '{:?}'", matched_scope);
+                        info!("Found a scope matching '{:?}'", matched_scope);
                         scopes = push_to_first(scopes, matched_scope);
                     }
                     None => {
-                        debug!("No scope matches currently staged files");
+                        info!("No scope matches currently staged files");
                     }
                 };
             }

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
-use log::debug;
+use log::{debug, info};
 use std::path::PathBuf;
 
 use self::commit_types::get_default_commit_types;
@@ -88,7 +88,7 @@ fn main() -> anyhow::Result<()> {
 
     // Handle no given command. This should be done first so nothing is really validated.
     let Some(command) = args.command else {
-        debug!("Running in default mode, just printing the types");
+        info!("Running in default mode, just printing the types");
         default_print(get_default_commit_types());
         return Ok(());
     };
@@ -102,7 +102,7 @@ fn main() -> anyhow::Result<()> {
         Command::Cache { command } => match command {
             CacheCommand::Create => {
                 cache::create_cache()?;
-                debug!("Populating the cache for the repo after cache creation");
+                info!("Populating the cache for the repo after cache creation");
                 cache::update_cache_for_repo(&repo)?
             }
             CacheCommand::Update => cache::update_cache_for_repo(&repo)?,
