@@ -165,7 +165,7 @@ pub fn create_cache() -> Result<()> {
         cache.save()?;
     }
 
-    println!("Cache created");
+    println!("Cache created at {}", cache_path.to_string_lossy());
     Ok(())
 }
 
