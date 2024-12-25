@@ -33,15 +33,17 @@ nix run . -- --help
 ```shell
 Tiny helper for conventional commits (https://www.conventionalcommits.org)
 
-Usage: conventional-commit-helper [OPTIONS] [MODE]
+Usage: conventional-commit-helper [OPTIONS] [COMMAND]
 
-Arguments:
-  [MODE]  [possible values: type, scope]
+Commands:
+  cache  Cache operations
+  type   Show commit types
+  scope  Show commit scopes
+  help   Print this message or the help of the given subcommand(s)
 
 Options:
-      --json                   Print output in JSON format
       --repo-path <REPO_PATH>  Path to the non-bare git repository [default: .]
-      --debug
+      --debug                  Enable debug logging
   -h, --help                   Print help
   -V, --version                Print version
 ```
