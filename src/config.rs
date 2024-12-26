@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use const_format::formatcp;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
@@ -11,8 +11,18 @@ use crate::utils::{UserProvidedCommitScope, UserProvidedCommitType};
 pub const DEFAULT_CONFIG_PATH_IN_REPO: &str =
     formatcp!(".dev{}conventional-commit-helper.toml", MAIN_SEPARATOR);
 
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize)]
+pub struct GeneralConfig {
+    scopes: Option<GeneralScopeConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize)]
+struct GeneralScopeConfig {
+    ignored: Option<Vec<String>>,
+}
+
 /// Holds the runtime configuration
-#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize)]
 pub struct Config {
     // Using "types" to prevent repetition in the config file
     // The code should use commit_types to be less ambiguous about the 'type' word
@@ -21,6 +31,20 @@ pub struct Config {
 
     #[serde(rename = "scopes")]
     pub commit_scopes: Option<Vec<UserProvidedCommitScope>>,
+
+    pub general: Option<GeneralConfig>,
+}
+
+/// Used internally to parse the file
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize)]
+struct ReadConfig {
+    #[serde(rename = "types")]
+    commit_types: Option<HashMap<String, String>>,
+
+    #[serde(rename = "scopes")]
+    commit_scopes: Option<HashMap<String, String>>,
+
+    general: Option<GeneralConfig>,
 }
 
 impl Config {
@@ -31,28 +55,28 @@ impl Config {
     /// should result in Config with one CommitType
     ///
     /// Extracted for easier testing
-    fn from_toml(toml_value: HashMap<String, HashMap<String, String>>) -> Result<Self> {
-        let commit_types: Option<Vec<UserProvidedCommitType>> = toml_value
-            .get("types")
+    fn from_str(toml_str: &str) -> Result<Self> {
+        let initial_result: ReadConfig = toml::from_str(toml_str)?;
+        let commit_types: Option<Vec<UserProvidedCommitType>> = initial_result
+            .commit_types
             .map(|x| x.iter().map(UserProvidedCommitType::from).collect());
-        let commit_scopes: Option<Vec<UserProvidedCommitType>> = toml_value
-            .get("scopes")
+        let commit_scopes: Option<Vec<UserProvidedCommitType>> = initial_result
+            .commit_scopes
             .map(|x| x.iter().map(UserProvidedCommitScope::from).collect());
+
         Ok(Self {
-            commit_types,
             commit_scopes,
+            commit_types,
+            general: initial_result.general,
         })
     }
+
     pub fn from_file(path: &Path) -> Result<Option<Self>> {
         match path.exists() {
             true => {
                 let content = fs::read_to_string(path)?;
 
-                // This error should be bubbled up
-                let raw_config: HashMap<String, HashMap<String, String>> =
-                    toml::from_str(&content)?;
-
-                Ok(Some(Self::from_toml(raw_config)?))
+                Ok(Some(Self::from_str(&content)?))
             }
             false => Ok(None),
         }
@@ -71,16 +95,14 @@ mod test {
     /// Make sure that the custom "turn key value" From actually works
     #[test]
     fn test_toml_parsing() {
-        let toml_data = indoc! {r#"
+        let toml_str = indoc! {r#"
                 [types]
                 foo = "bar"
                 [scopes]
                 foz = "baz"
                 "#};
 
-        let res = Config::from_toml(
-            toml::from_str(toml_data).expect("This is a test. Parsing should not explode."),
-        );
+        let res = Config::from_str(toml_str);
 
         let expected = Config {
             commit_types: Some(vec![UserProvidedCommitType {
@@ -91,8 +113,23 @@ mod test {
                 name: "foz".to_string(),
                 description: "baz".to_string(),
             }]),
+            general: None,
         };
 
         assert_eq!(res.unwrap(), expected)
+    }
+
+    #[test]
+    fn test_general_settings() {
+        let toml_str = indoc! {r#"
+            [general]
+            scopes.ignored = ["foo", "bar"]
+                "#};
+        let config: Config = Config::from_str(toml_str).unwrap();
+
+        assert_eq!(
+            config.general.unwrap().scopes.unwrap().ignored.unwrap(),
+            vec!["foo", "bar"]
+        )
     }
 }
