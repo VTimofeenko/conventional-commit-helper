@@ -1,30 +1,16 @@
 use anyhow::Result;
-use git2::Repository;
 use log::info;
 
 use crate::config::Config;
-use crate::utils::{CommitType, UserProvidedCommitType, DEFAULT_COMMIT_TYPES};
+use crate::utils::{CommitType, DEFAULT_COMMIT_TYPES};
 
-fn try_get_commit_types_from_repo(
-    repo: &Repository,
-) -> Result<Option<Vec<UserProvidedCommitType>>> {
-    match Config::try_from_repo(repo)? {
+pub fn get_commit_types_from_repo_or_default(
+    config: Option<Config>,
+) -> Result<Vec<CommitType<String>>> {
+    match config {
         Some(config) => {
-            info!("Found config in repo, returning its commit_types");
-            Ok(config.commit_types)
-        }
-        None => {
-            info!("No user-defined commit types found");
-            Ok(None)
-        }
-    }
-}
-
-pub fn get_commit_types_from_repo_or_default(repo: &Repository) -> Result<Vec<CommitType<String>>> {
-    match try_get_commit_types_from_repo(repo)? {
-        Some(x) => {
-            info!("Found custom commit types, returning them");
-            Ok(x)
+            info!("Found config, returning its commit_types");
+            Ok(config.commit_types.unwrap_or_else(get_default_commit_types))
         }
         None => {
             info!("No custom commit types found, returning default");
@@ -80,21 +66,12 @@ mod tests {
     }
 
     #[rstest]
-    fn empty_repo_check_no_custom_types() {
-        let dir = testdir!();
-        let repo = setup_repo_with_commits(&dir, &["init"]);
-
-        let res = try_get_commit_types_from_repo(&repo);
-
-        assert!(res.unwrap().is_none())
-    }
-
-    #[rstest]
     fn empty_repo_check_default_returned() {
         let dir = testdir!();
         let repo = setup_repo_with_commits(&dir, &["init"]);
+        let config = Config::load(&repo, None).unwrap();
 
-        let res = get_commit_types_from_repo_or_default(&repo);
+        let res = get_commit_types_from_repo_or_default(config);
 
         assert_eq!(res.unwrap(), DEFAULT_COMMIT_TYPES)
     }
@@ -106,8 +83,9 @@ mod tests {
         let repo = setup_repo_with_commits(&dir, &["init"]);
         // This test should control its own commit types to test
         setup_config_file_in_path(&dir, &mk_types());
+        let config = Config::load(&repo, None).unwrap();
 
-        let res = get_commit_types_from_repo_or_default(&repo).unwrap();
+        let res = get_commit_types_from_repo_or_default(config).unwrap();
 
         assert_eq!(res.len(), 1);
         assert_eq!(res.first().unwrap().name, "foo");

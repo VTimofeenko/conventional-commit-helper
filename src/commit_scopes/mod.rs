@@ -20,19 +20,19 @@ mod distance;
 /// This function should not panic.
 pub fn try_get_commit_scopes_from_repo(
     repo: &Repository,
+    config: Option<Config>,
 ) -> Result<Option<Vec<UserProvidedCommitScope>>> {
     debug!("Looking for scopes in config");
-    let scopes_from_config: Option<Vec<UserProvidedCommitScope>> =
-        match Config::try_from_repo(repo)? {
-            Some(config) => {
-                info!("Found config in repo, returning its commit_scopes");
-                config.commit_scopes
-            }
-            None => {
-                info!("No user-defined commit scopes found");
-                None
-            }
-        };
+    let scopes_from_config: Option<Vec<UserProvidedCommitScope>> = match config {
+        Some(config) => {
+            info!("Found config in repo, returning its commit_scopes");
+            config.commit_scopes
+        }
+        None => {
+            info!("No user-defined commit scopes found in the repo");
+            None
+        }
+    };
 
     // Look up scopes for the repo in the cache
     // Possible options:
@@ -165,8 +165,9 @@ mod tests {
         let dir = testdir!();
         let repo = setup_repo_with_commits(&dir, &["init"]);
         setup_config_file_in_path(&dir, &mk_scopes);
+        let config = Config::load(&repo, None).unwrap();
 
-        let res = try_get_commit_scopes_from_repo(&repo)
+        let res = try_get_commit_scopes_from_repo(&repo, config)
             .unwrap()
             .expect("There should be something returned here");
         assert_eq!(res.len(), 1);
@@ -182,8 +183,9 @@ mod tests {
         let dir = testdir!();
         let repo = setup_repo_with_commits(&dir, &["init", "foo(foz): bar"]);
         mk_config_with_scopes_only(&dir);
+        let config = Config::load(&repo, None).unwrap();
 
-        let res = try_get_commit_scopes_from_repo(&repo)
+        let res = try_get_commit_scopes_from_repo(&repo, config)
             .unwrap()
             .expect("There should be something returned here");
 

@@ -4,6 +4,7 @@ use log::{debug, info};
 use std::path::PathBuf;
 
 use self::commit_types::get_default_commit_types;
+use self::config::Config;
 use self::utils::{repo_from_path, validate_repo, PrintableEntity};
 
 mod cache;
@@ -53,6 +54,10 @@ struct Args {
     #[arg(long, default_value = ".")]
     repo_path: PathBuf,
 
+    /// Path to a custom config file
+    #[arg(long)]
+    config: Option<PathBuf>,
+
     #[command(flatten)]
     verbose: Verbosity,
 
@@ -98,6 +103,9 @@ fn main() -> anyhow::Result<()> {
     let repo = repo_from_path(&args.repo_path)?;
 
     validate_repo(&repo)?;
+
+    let config = Config::load(&repo, args.config)?;
+
     match command {
         Command::Cache { command } => match command {
             CacheCommand::Create => {
@@ -112,7 +120,7 @@ fn main() -> anyhow::Result<()> {
             CacheCommand::Nuke => cache::nuke_cache()?,
         },
         Command::Type { json } => {
-            let output = commit_types::get_commit_types_from_repo_or_default(&repo)?;
+            let output = commit_types::get_commit_types_from_repo_or_default(config)?;
 
             match json {
                 true => json_print(output),
@@ -120,8 +128,8 @@ fn main() -> anyhow::Result<()> {
             }
         }
         Command::Scope { json } => {
-            let output =
-                commit_scopes::try_get_commit_scopes_from_repo(&repo)?.unwrap_or_else(Vec::new);
+            let output = commit_scopes::try_get_commit_scopes_from_repo(&repo, config)?
+                .unwrap_or_else(Vec::new);
 
             match json {
                 true => json_print(output),
