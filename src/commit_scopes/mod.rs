@@ -1,4 +1,7 @@
+use dialoguer::Confirm;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash};
 
 use anyhow::Result;
 use git2::Repository;
@@ -6,15 +9,17 @@ use itertools::sorted;
 use log::{debug, info, warn};
 
 use crate::cache::Cache;
-use crate::config::Config;
+use crate::config::{Config, RegenerateOnStale};
 use crate::utils::UserProvidedCommitScope;
 
 pub mod commit;
 
-use self::commit::{get_scopes_x_changes, get_staged_files, ChangedFiles};
+use self::commit::{get_scopes_x_changes, get_staged_files};
 use self::distance::find_closest_neighbor;
 
 mod distance;
+
+const TTL: u64 = 86400; // 24 hours
 
 /// The main entry point to retrieve commit scopes from a git repository at location
 /// This function should not panic.
@@ -23,13 +28,16 @@ pub fn try_get_commit_scopes_from_repo(
     config: Option<Config>,
 ) -> Result<Option<Vec<UserProvidedCommitScope>>> {
     debug!("Looking for scopes in config");
+    let mut hasher = DefaultHasher::new();
+    config.hash(&mut hasher);
+
     let ignored_scopes = config
         .as_ref()
         .and_then(|c| c.general.as_ref())
         .and_then(|g| g.scopes.as_ref())
         .and_then(|s| s.ignored.clone());
 
-    let scopes_from_config = config.and_then(|c| c.commit_scopes);
+    let scopes_from_config = config.as_ref().and_then(|c| c.commit_scopes.clone());
 
     let scopes_from_config = scopes_from_config.map(|scopes| {
         scopes
@@ -47,17 +55,54 @@ pub fn try_get_commit_scopes_from_repo(
     // 1. Cache failed to load/does not exist -- log error and fall back to history
     // 2. Cache loaded OK but does not have entry for current repo -- log and fall back
     // 3. Cache loaded OK and has entry for current repo -- use that entry
-    let scopes_from_cache: Option<HashMap<UserProvidedCommitScope, ChangedFiles>> =
-        match Cache::load() {
-            Ok(cache) => {
-                info!("Loading scopes from cache");
-                cache.get_scopes_for_repo(repo)
-            }
-            Err(e) => {
-                warn!("Cache could not be loaded because of {:?}", e);
+    let scopes_from_cache = match Cache::load() {
+        Ok(cache) => {
+            info!("Loading scopes from cache");
+            if let Some(entry) = cache.get_scopes_for_repo(repo) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs();
+                let head_commit_hash = repo.head()?.target().unwrap().to_string();
+
+                if now - entry.timestamp < TTL || entry.head_commit_hash == head_commit_hash {
+                    debug!("Cache is valid");
+                    return Ok(Some(entry.scopes.keys().cloned().collect::<Vec<_>>()));
+                } else {
+                    info!("Cache is stale");
+
+                    match config.as_ref().unwrap().cache.regenerate_on_stale {
+                        RegenerateOnStale::Always => {
+                            info!("Regenerating cache");
+                            let scopes = get_scopes_x_changes(repo)?;
+                            Some(scopes.unwrap_or_default())
+                        }
+                        RegenerateOnStale::Prompt => {
+                            if Confirm::new()
+                                .with_prompt("Cache is stale. Regenerate?")
+                                .interact()?
+                            {
+                                info!("Regenerating cache");
+                                let scopes = get_scopes_x_changes(repo)?;
+                                Some(scopes.unwrap_or_default())
+                            } else {
+                                None
+                            }
+                        }
+                        RegenerateOnStale::Never => {
+                            info!("Not regenerating cache");
+                            None
+                        }
+                    }
+                }
+            } else {
                 None
             }
-        };
+        }
+        Err(e) => {
+            warn!("Cache could not be loaded because of {:?}", e);
+            None
+        }
+    };
 
     let other_scopes = scopes_from_cache.or_else(|| {
         warn!("Git history scope lookups are a bit slow. Consider using the cache (see --help)");

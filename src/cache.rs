@@ -65,6 +65,8 @@ use crate::utils::UserProvidedCommitScope;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CacheEntry {
     pub scopes: HashMap<UserProvidedCommitScope, ChangedFiles>,
+    pub timestamp: u64,
+    pub head_commit_hash: String,
 }
 
 /// Repo identifier in the cache.
@@ -114,13 +116,8 @@ impl Cache {
         }
     }
 
-    pub fn get_scopes_for_repo(
-        &self,
-        repo: &Repository,
-    ) -> Option<HashMap<UserProvidedCommitScope, ChangedFiles>> {
-        self.entries
-            .get(&get_repo_id(repo))
-            .map(|x| x.scopes.clone())
+    pub fn get_scopes_for_repo(&self, repo: &Repository) -> Option<&CacheEntry> {
+        self.entries.get(&get_repo_id(repo))
     }
 }
 
@@ -189,6 +186,10 @@ pub fn update_cache_for_repo(repo: &Repository) -> Result<()> {
                 repo_id,
                 CacheEntry {
                     scopes: scopes_changes,
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)?
+                        .as_secs(),
+                    head_commit_hash: repo.head()?.target().unwrap().to_string(),
                 },
             );
         }

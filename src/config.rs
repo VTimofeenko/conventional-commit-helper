@@ -15,18 +15,33 @@ pub const DEFAULT_CONFIG_PATH_IN_REPO: &str =
     formatcp!(".dev{}conventional-commit-helper.toml", MAIN_SEPARATOR);
 const CONFIG_FILE_NAME: &str = "conventional-commit-helper.toml";
 
-#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default)]
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default, Hash)]
 pub struct GeneralConfig {
     pub scopes: Option<GeneralScopeConfig>,
 }
 
-#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default)]
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default, Hash)]
 pub struct GeneralScopeConfig {
     pub ignored: Option<Vec<String>>,
 }
 
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Hash, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum RegenerateOnStale {
+    #[default]
+    Always,
+    Prompt,
+    Never,
+}
+
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default, Hash)]
+pub struct CacheConfig {
+    #[serde(default)]
+    pub regenerate_on_stale: RegenerateOnStale,
+}
+
 /// Holds the runtime configuration
-#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default)]
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default, Hash)]
 pub struct Config {
     // Using "types" to prevent repetition in the config file
     // The code should use commit_types to be less ambiguous about the 'type' word
@@ -37,6 +52,9 @@ pub struct Config {
     pub commit_scopes: Option<Vec<UserProvidedCommitScope>>,
 
     pub general: Option<GeneralConfig>,
+
+    #[serde(default)]
+    pub cache: CacheConfig,
 }
 
 /// Used internally to parse the file
@@ -49,6 +67,8 @@ struct ReadConfig {
     commit_scopes: Option<HashMap<String, String>>,
 
     general: Option<GeneralConfig>,
+
+    cache: Option<CacheConfig>,
 }
 
 impl Config {
@@ -72,6 +92,7 @@ impl Config {
             commit_scopes,
             commit_types,
             general: initial_result.general,
+            cache: initial_result.cache.unwrap_or_default(),
         })
     }
 
@@ -109,11 +130,13 @@ impl Config {
             .collect();
 
         let general = self.general.or(other.general);
+        let cache = self.cache;
 
         Self {
             commit_types: Some(commit_types),
             commit_scopes: Some(commit_scopes),
             general,
+            cache,
         }
     }
 
@@ -169,6 +192,7 @@ mod test {
                 description: "baz".to_string(),
             }]),
             general: None,
+            cache: CacheConfig::default(),
         };
 
         assert_eq!(res.unwrap(), expected)
@@ -189,6 +213,17 @@ mod test {
     }
 
     #[test]
+    fn test_cache_settings() {
+        let toml_str = indoc! {r#"
+            [cache]
+            regenerate_on_stale = "prompt"
+                "#};
+        let config: Config = Config::from_str(toml_str).unwrap();
+
+        assert_eq!(config.cache.regenerate_on_stale, RegenerateOnStale::Prompt)
+    }
+
+    #[test]
     fn test_config_merge() {
         let repo_config = Config {
             commit_types: Some(vec![UserProvidedCommitType {
@@ -200,6 +235,9 @@ mod test {
                 description: "baz".to_string(),
             }]),
             general: None,
+            cache: CacheConfig {
+                regenerate_on_stale: RegenerateOnStale::Prompt,
+            },
         };
 
         let global_config = Config {
@@ -212,6 +250,7 @@ mod test {
                 description: "global".to_string(),
             }]),
             general: None,
+            cache: CacheConfig::default(),
         };
 
         let merged = repo_config.merge(global_config);
@@ -232,6 +271,9 @@ mod test {
                 },
             ]),
             general: None,
+            cache: CacheConfig {
+                regenerate_on_stale: RegenerateOnStale::Prompt,
+            },
         };
 
         assert_eq!(merged, expected);
