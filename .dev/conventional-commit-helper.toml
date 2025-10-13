@@ -1,0 +1,6 @@
+[scopes]
+main = "Usually having to do with the overall logic of the program"
+config = "Configuration-related changes. Either in-repo config or the global one"
+scope = "Changes related to commit scopes (main/config/etc.)"
+type = "Changes related to commit types (feat/fix/etc.)"
+cache = "Scope cache changes"
