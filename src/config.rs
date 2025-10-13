@@ -17,12 +17,12 @@ const CONFIG_FILE_NAME: &str = "conventional-commit-helper.toml";
 
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default)]
 pub struct GeneralConfig {
-    scopes: Option<GeneralScopeConfig>,
+    pub scopes: Option<GeneralScopeConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default)]
-struct GeneralScopeConfig {
-    ignored: Option<Vec<String>>,
+pub struct GeneralScopeConfig {
+    pub ignored: Option<Vec<String>>,
 }
 
 /// Holds the runtime configuration

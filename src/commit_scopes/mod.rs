@@ -23,16 +23,24 @@ pub fn try_get_commit_scopes_from_repo(
     config: Option<Config>,
 ) -> Result<Option<Vec<UserProvidedCommitScope>>> {
     debug!("Looking for scopes in config");
-    let scopes_from_config: Option<Vec<UserProvidedCommitScope>> = match config {
-        Some(config) => {
-            info!("Found config in repo, returning its commit_scopes");
-            config.commit_scopes
-        }
-        None => {
-            info!("No user-defined commit scopes found in the repo");
-            None
-        }
-    };
+    let ignored_scopes = config
+        .as_ref()
+        .and_then(|c| c.general.as_ref())
+        .and_then(|g| g.scopes.as_ref())
+        .and_then(|s| s.ignored.clone());
+
+    let scopes_from_config = config.and_then(|c| c.commit_scopes);
+
+    let scopes_from_config = scopes_from_config.map(|scopes| {
+        scopes
+            .into_iter()
+            .filter(|scope| {
+                ignored_scopes
+                    .as_ref()
+                    .map_or(true, |ignored| !ignored.contains(&scope.name))
+            })
+            .collect()
+    });
 
     // Look up scopes for the repo in the cache
     // Possible options:
@@ -55,6 +63,17 @@ pub fn try_get_commit_scopes_from_repo(
         warn!("Git history scope lookups are a bit slow. Consider using the cache (see --help)");
         info!("Falling back to searching scopes in history");
         get_scopes_x_changes(repo).unwrap_or(None)
+    });
+
+    let other_scopes = other_scopes.map(|scopes| {
+        scopes
+            .into_iter()
+            .filter(|(scope, _)| {
+                ignored_scopes
+                    .as_ref()
+                    .map_or(true, |ignored| !ignored.contains(&scope.name))
+            })
+            .collect::<HashMap<_, _>>()
     });
 
     // This can be written more concisely but I will trade it off for readability
