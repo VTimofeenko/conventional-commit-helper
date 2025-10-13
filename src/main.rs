@@ -21,8 +21,10 @@ enum CacheCommand {
     Update,
     /// Drops cache for a repo
     Drop,
-    /// Delete the whole cache
+    /// Deletes the whole cache
     Nuke,
+    /// Shows the content of the cache
+    Show,
 }
 
 #[derive(Subcommand, Debug)]
@@ -118,6 +120,8 @@ fn main() -> anyhow::Result<()> {
             CacheCommand::Drop => cache::drop_cache_for_repo(&repo)?,
 
             CacheCommand::Nuke => cache::nuke_cache()?,
+
+            CacheCommand::Show => cache::show_cache()?,
         },
         Command::Type { json } => {
             let output = commit_types::get_commit_types_from_repo_or_default(config)?;

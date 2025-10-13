@@ -239,3 +239,12 @@ pub fn nuke_cache() -> Result<()> {
     }
     Ok(())
 }
+
+pub fn show_cache() -> Result<()> {
+    println!("Cached repos:");
+    let cache = Cache::load()?;
+    for (k,v) in cache.entries {
+        println!("- {}: timestamp: {}, hash: {}", k.to_string_lossy(), v.timestamp, v.head_commit_hash);
+    }
+    Ok(())
+}

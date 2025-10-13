@@ -222,6 +222,43 @@ fn cache_ops() {
     assert!(!cache_path.exists());
 }
 
+#[test]
+fn cache_show() {
+    init_logger();
+
+    // Set up environment
+    let dir = assert_fs::TempDir::new().unwrap();
+    let repo_path = dir.path().join("repo");
+    let _repo = setup_repo_with_commits_and_files(
+        &repo_path,
+        &["init", "foo(z_bar): quux", "foo(baz): quux"],
+        &["init", "one", "two"],
+    );
+
+    Command::cargo_bin(BIN_NAME)
+        .unwrap()
+        .env("XDG_CACHE_HOME", dir.path())
+        .arg("-vvv")
+        .arg("--repo-path")
+        .arg(&repo_path)
+        .arg("cache")
+        .arg("create")
+        .assert()
+        .success();
+
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.env("XDG_CACHE_HOME", dir.path())
+        .arg("-vvv")
+        .arg("--repo-path")
+        .arg(&repo_path)
+        .arg("cache")
+        .arg("show");
+
+    cmd.assert()
+        .success()
+        .stdout(contains(repo_path.to_str().unwrap()));
+}
+
 // Ensure logger is initialized only once for all tests
 static INIT: Once = Once::new();
 
