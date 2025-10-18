@@ -23,6 +23,7 @@ pub struct GeneralConfig {
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Default, Hash)]
 pub struct GeneralScopeConfig {
     pub ignored: Option<Vec<String>>,
+    pub disable_history_search: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq, Serialize, Hash, Default)]

@@ -37,6 +37,13 @@ pub fn try_get_commit_scopes_from_repo(
         .and_then(|g| g.scopes.as_ref())
         .and_then(|s| s.ignored.clone());
 
+    let disable_history_search = config
+        .as_ref()
+        .and_then(|c| c.general.as_ref())
+        .and_then(|g| g.scopes.as_ref())
+        .and_then(|s| s.disable_history_search)
+        .unwrap_or(false);
+
     let scopes_from_config = config.as_ref().and_then(|c| c.commit_scopes.clone());
 
     let scopes_from_config = scopes_from_config.map(|scopes| {
@@ -104,11 +111,16 @@ pub fn try_get_commit_scopes_from_repo(
         }
     };
 
-    let other_scopes = scopes_from_cache.or_else(|| {
-        warn!("Git history scope lookups are a bit slow. Consider using the cache (see --help)");
-        info!("Falling back to searching scopes in history");
-        get_scopes_x_changes(repo).unwrap_or(None)
-    });
+    let other_scopes = if disable_history_search {
+        debug!("Config setting disabled search in history");
+        None
+    } else {
+        scopes_from_cache.or_else(|| {
+            warn!("Git history scope lookups are a bit slow. Consider using the cache (see --help)");
+            info!("Falling back to searching scopes in history");
+            get_scopes_x_changes(repo).unwrap_or(None)
+        })
+    };
 
     let other_scopes = other_scopes.map(|scopes| {
         scopes
