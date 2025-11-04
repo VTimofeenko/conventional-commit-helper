@@ -1,7 +1,7 @@
 use dialoguer::Confirm;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
-use std::hash::{Hash};
+use std::hash::Hash;
 
 use anyhow::Result;
 use git2::Repository;
@@ -129,7 +129,9 @@ pub fn try_get_commit_scopes_from_repo(
         None
     } else {
         scopes_from_cache.or_else(|| {
-            warn!("Git history scope lookups are a bit slow. Consider using the cache (see --help)");
+            warn!(
+                "Git history scope lookups are a bit slow. Consider using the cache (see --help)"
+            );
             info!("Falling back to searching scopes in history");
             get_scopes_x_changes(repo).unwrap_or(None)
         })
