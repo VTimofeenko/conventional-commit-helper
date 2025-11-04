@@ -174,14 +174,22 @@ pub fn get_scopes_x_changes(
 
                     // PERF: this looks like a potentially unneeded lookup. If performance starts to suffer --
                     // might be worth refactoring this
-                    let commit = repo
-                        .find_commit(oid)
-                        .expect("This commit really should exist");
+                    let commit = match repo.find_commit(oid) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            warn!("Failed to find commit {}: {}", oid, e);
+                            return acc;
+                        }
+                    };
 
                     trace!("Checking commit OID {:?}", commit.id());
-                    let scope = get_scope_from_commit_message(
-                        commit.summary().expect("Commit should have a message"),
-                    );
+                    let summary = if let Some(s) = commit.summary() {
+                        s
+                    } else {
+                        warn!("Commit {} has a non-UTF8 message, skipping", commit.id());
+                        return acc;
+                    };
+                    let scope = get_scope_from_commit_message(summary);
                     if let Some(extracted_scope) = scope {
                         let scope_obj = UserProvidedCommitScope::new(extracted_scope);
                         let changed_files = get_changed_files_from_commit(&commit, repo);

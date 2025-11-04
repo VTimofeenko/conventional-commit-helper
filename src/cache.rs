@@ -189,7 +189,11 @@ pub fn update_cache_for_repo(repo: &Repository) -> Result<()> {
                     timestamp: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)?
                         .as_secs(),
-                    head_commit_hash: repo.head()?.target().unwrap().to_string(),
+                    head_commit_hash: repo
+                        .head()?
+                        .target()
+                        .ok_or_else(|| anyhow::anyhow!("HEAD reference has no target. Are there commits in this repository?"))?
+                        .to_string(),
                 },
             );
         }

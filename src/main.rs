@@ -76,12 +76,13 @@ where
     output.iter().for_each(|x| println!("{}", x))
 }
 
-fn json_print<S>(output: Vec<PrintableEntity<S>>)
+fn json_print<S>(output: Vec<PrintableEntity<S>>) -> anyhow::Result<()>
 where
     S: serde::Serialize,
     std::string::String: std::convert::From<S>,
 {
-    println!("{}", serde_json::to_string(&output).unwrap())
+    println!("{}", serde_json::to_string(&output)?);
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
@@ -127,7 +128,7 @@ fn main() -> anyhow::Result<()> {
             let output = commit_types::get_commit_types_from_repo_or_default(config)?;
 
             match json {
-                true => json_print(output),
+                true => json_print(output)?,
                 false => default_print(output),
             }
         }
@@ -136,7 +137,7 @@ fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(Vec::new);
 
             match json {
-                true => json_print(output),
+                true => json_print(output)?,
                 false => default_print(output),
             }
         }

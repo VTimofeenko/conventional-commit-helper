@@ -148,7 +148,7 @@ impl Config {
         }
 
         let repo_config =
-            Self::from_file(&repo.workdir().unwrap().join(DEFAULT_CONFIG_PATH_IN_REPO))?;
+            Self::from_file(&repo.workdir().expect("Repository should not be bare").join(DEFAULT_CONFIG_PATH_IN_REPO))?;
 
         let global_config_path = Self::get_global_config_path();
         let global_config = if let Some(path) = global_config_path {

@@ -69,7 +69,15 @@ pub fn try_get_commit_scopes_from_repo(
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)?
                     .as_secs();
-                let head_commit_hash = repo.head()?.target().unwrap().to_string();
+                let head_commit_hash = repo
+                    .head()?
+                    .target()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "HEAD reference has no target. Are there commits in this repository?"
+                        )
+                    })?
+                    .to_string();
 
                 if now - entry.timestamp < TTL || entry.head_commit_hash == head_commit_hash {
                     debug!("Cache is valid");
