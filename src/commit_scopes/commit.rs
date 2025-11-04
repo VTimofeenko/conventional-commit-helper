@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use fancy_regex::Regex;
 use git2::{Commit, Repository, Status};
 use itertools::any;
@@ -20,63 +20,41 @@ pub type ChangedFiles = HashSet<String>;
 /// Returns the list of changed files
 ///
 /// Using hashset to explicitly denote that there is no order
-fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> Result<ChangedFiles> {
-    let mut res = HashSet::new(); // Accumulator object
-
-    let this_commit_tree = match commit.tree() {
-        Ok(x) => x,
-        Err(e) => {
-            return Err(anyhow::anyhow!(
-                "Cannot get the {:?} commit's tree. Error: {:?}",
-                commit.id(),
-                e
-            ));
+fn get_changed_files_from_diff(diff: &git2::Diff) -> ChangedFiles {
+    let mut res = HashSet::new();
+    diff.deltas().for_each(|delta| {
+        if let Some(path_str) = delta.new_file().path().and_then(|p| p.to_str()) {
+            res.insert(path_str.to_string());
+        } else {
+            warn!("Cannot get the changed file path, probably it's not utf-8 and will be ignored");
         }
-    };
+    });
+    res
+}
 
-    // no parents <=> initial commit?
-    if commit.parent_count() != 0 {
+pub(super) fn get_changed_files_from_commit(
+    commit: &Commit,
+    repo: &Repository,
+) -> Result<ChangedFiles> {
+    let mut res = HashSet::new();
+    let this_commit_tree = commit
+        .tree()
+        .with_context(|| format!("Failed to get tree for commit {}", commit.id()))?;
+
+    if commit.parent_count() == 0 {
+        // Handle initial commit by diffing against an empty tree
+        let diff = repo.diff_tree_to_tree(None, Some(&this_commit_tree), None)?;
+        res.extend(get_changed_files_from_diff(&diff));
+    } else {
         for parent in commit.parents() {
-            let parent_tree = match parent.tree() {
-                Ok(t) => t,
-                Err(e) => {
-                    warn!("Cannot find a tree for the parent {:?}", parent.id());
-                    warn!("Error: {:?}", e);
-                    warn!("Skipping the parent");
-                    continue;
-                }
-            };
-            let diff = match repo.diff_tree_to_tree(
-                Some(&parent_tree),
-                Some(&this_commit_tree),
-                Some(&mut git2::DiffOptions::new()),
-            ) {
-                Ok(x) => x,
-                Err(e) => {
-                    warn!(
-                        "Cannot find diff from {:?} to {:?}",
-                        parent_tree.id(),
-                        this_commit_tree.id()
-                    );
-                    warn!("Error: {:?}", e);
-                    warn!("Skipping parent");
-                    continue;
-                }
-            };
-
-            diff.deltas().for_each(|delta| {
-                let changed_file = match delta.new_file().path().and_then(|p| p.to_str()) {
-                    Some(path) => path.to_string(),
-                    None => {
-                        warn!("Cannot get the changed file path, probably it's not utf-8");
-                        warn!("It will be ignored");
-                        return;
-                    }
-                };
-                res.insert(changed_file);
-            });
+            let parent_tree = parent
+                .tree()
+                .with_context(|| format!("Failed to get tree for parent commit {}", parent.id()))?;
+            let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&this_commit_tree), None)?;
+            res.extend(get_changed_files_from_diff(&diff));
         }
-    };
+    }
+
     Ok(res)
 }
 
@@ -317,7 +295,7 @@ mod tests {
             mk_set(["two"]),
             mk_set(["two"]),
             mk_set(["one"]),
-            HashSet::new(),
+            mk_set(["init"]),
         ];
 
         assert_eq!(test_res, expected);
