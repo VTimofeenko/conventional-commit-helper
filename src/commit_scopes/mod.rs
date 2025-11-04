@@ -77,7 +77,12 @@ pub fn try_get_commit_scopes_from_repo(
                 } else {
                     info!("Cache is stale");
 
-                    match config.as_ref().unwrap().cache.regenerate_on_stale {
+                    let regenerate_on_stale = config
+                        .as_ref()
+                        .map(|c| c.cache.regenerate_on_stale.clone())
+                        .unwrap_or_default();
+
+                    match regenerate_on_stale {
                         RegenerateOnStale::Always => {
                             info!("Regenerating cache");
                             let scopes = get_scopes_x_changes(repo)?;
