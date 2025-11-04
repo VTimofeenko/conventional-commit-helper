@@ -20,16 +20,17 @@ pub type ChangedFiles = HashSet<String>;
 /// Returns the list of changed files
 ///
 /// Using hashset to explicitly denote that there is no order
-fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedFiles {
+fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> Result<ChangedFiles> {
     let mut res = HashSet::new(); // Accumulator object
 
     let this_commit_tree = match commit.tree() {
         Ok(x) => x,
         Err(e) => {
-            warn!("Cannot get the {:?} commit's tree.", commit.id());
-            warn!("Error: {:?}", e);
-            warn!("Returning no changes");
-            return res;
+            return Err(anyhow::anyhow!(
+                "Cannot get the {:?} commit's tree. Error: {:?}",
+                commit.id(),
+                e
+            ));
         }
     };
 
@@ -76,7 +77,7 @@ fn get_changed_files_from_commit(commit: &Commit, repo: &Repository) -> ChangedF
             });
         }
     };
-    res
+    Ok(res)
 }
 
 /// This function should be called on a repo to get the staged files
@@ -192,7 +193,17 @@ pub fn get_scopes_x_changes(
                     let scope = get_scope_from_commit_message(summary);
                     if let Some(extracted_scope) = scope {
                         let scope_obj = UserProvidedCommitScope::new(extracted_scope);
-                        let changed_files = get_changed_files_from_commit(&commit, repo);
+                        let changed_files = match get_changed_files_from_commit(&commit, repo) {
+                            Ok(files) => files,
+                            Err(e) => {
+                                warn!(
+                                    "Failed to get changed files for commit {}: {}",
+                                    commit.id(),
+                                    e
+                                );
+                                return acc;
+                            }
+                        };
 
                         if let Some(existing_changed_files) = acc.get_mut(&scope_obj) {
                             existing_changed_files.extend(changed_files);
@@ -297,7 +308,10 @@ mod tests {
         // 2. The order of changed files should match what's expected.
         let test_res: Vec<HashSet<String>> = reflog
             .iter()
-            .map(|x| get_changed_files_from_commit(&repo.find_commit(x.id_new()).unwrap(), &repo))
+            .map(|x| {
+                get_changed_files_from_commit(&repo.find_commit(x.id_new()).unwrap(), &repo)
+                    .expect("Should get changed files")
+            })
             .collect();
         let expected: Vec<HashSet<String>> = vec![
             mk_set(["two"]),
