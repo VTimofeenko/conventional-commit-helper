@@ -8,7 +8,7 @@ use git2::Repository;
 use itertools::sorted;
 use log::{debug, info, warn};
 
-use crate::cache::Cache;
+use crate::cache::{update_cache_for_repo, Cache};
 use crate::config::{Config, RegenerateOnStale};
 use crate::utils::UserProvidedCommitScope;
 
@@ -93,6 +93,7 @@ pub fn try_get_commit_scopes_from_repo(
                     match regenerate_on_stale {
                         RegenerateOnStale::Always => {
                             info!("Regenerating cache");
+                            update_cache_for_repo(repo)?;
                             let scopes = get_scopes_x_changes(repo)?;
                             Some(scopes.unwrap_or_default())
                         }
@@ -102,6 +103,7 @@ pub fn try_get_commit_scopes_from_repo(
                                 .interact()?
                             {
                                 info!("Regenerating cache");
+                                update_cache_for_repo(repo)?;
                                 let scopes = get_scopes_x_changes(repo)?;
                                 Some(scopes.unwrap_or_default())
                             } else {
