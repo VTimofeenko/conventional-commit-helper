@@ -13,7 +13,7 @@ use std::hash::Hash;
 
 pub mod commit;
 
-use self::commit::{get_scopes_x_changes, get_staged_files};
+use self::commit::{get_scopes_x_changes, get_staged_files, ChangedFiles};
 use self::distance::find_closest_neighbor;
 
 mod distance;
@@ -39,6 +39,83 @@ impl PrintableEntity for CommitScope {
     }
     fn description(&self) -> &str {
         &self.description
+    }
+}
+
+
+
+enum CacheResult {
+    Valid(Vec<CommitScope>),
+    Stale(Option<HashMap<CommitScope, ChangedFiles>>),
+    NotFound,
+}
+
+fn try_get_scopes_from_cache(
+    repo: &Repository,
+    config: &Option<Config>,
+) -> Result<CacheResult> {
+    match Cache::load() {
+        Ok(cache) => {
+            info!("Loading scopes from cache");
+            if let Some(entry) = cache.get_scopes_for_repo(repo) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs();
+                let head_commit_hash = repo
+                    .head()?
+                    .target()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "HEAD reference has no target. Are there commits in this repository?"
+                        )
+                    })?
+                    .to_string();
+
+                if now - entry.timestamp < TTL || entry.head_commit_hash == head_commit_hash {
+                    debug!("Cache is valid");
+                    return Ok(CacheResult::Valid(entry.scopes.keys().cloned().collect::<Vec<_>>()));
+                } else {
+                    info!("Cache is stale");
+
+                    let regenerate_on_stale = config
+                        .as_ref()
+                        .map(|c| c.cache.regenerate_on_stale.clone())
+                        .unwrap_or_default();
+
+                    match regenerate_on_stale {
+                        RegenerateOnStale::Always => {
+                            info!("Regenerating cache");
+                            update_cache_for_repo(repo)?;
+                            let scopes = get_scopes_x_changes(repo)?;
+                            Ok(CacheResult::Stale(Some(scopes.unwrap_or_default())))
+                        }
+                        RegenerateOnStale::Prompt => {
+                            if Confirm::new()
+                                .with_prompt("Cache is stale. Regenerate?")
+                                .interact()?
+                            {
+                                info!("Regenerating cache");
+                                update_cache_for_repo(repo)?;
+                                let scopes = get_scopes_x_changes(repo)?;
+                                Ok(CacheResult::Stale(Some(scopes.unwrap_or_default())))
+                            } else {
+                                Ok(CacheResult::Stale(None))
+                            }
+                        }
+                        RegenerateOnStale::Never => {
+                            info!("Not regenerating cache");
+                            Ok(CacheResult::Stale(None))
+                        }
+                    }
+                }
+            } else {
+                Ok(CacheResult::NotFound)
+            }
+        }
+        Err(e) => {
+            warn!("Cache could not be loaded because of {:?}", e);
+            Ok(CacheResult::NotFound)
+        }
     }
 }
 
@@ -85,68 +162,10 @@ pub fn try_get_commit_scopes_from_repo(
     // 1. Cache failed to load/does not exist -- log error and fall back to history
     // 2. Cache loaded OK but does not have entry for current repo -- log and fall back
     // 3. Cache loaded OK and has entry for current repo -- use that entry
-    let scopes_from_cache = match Cache::load() {
-        Ok(cache) => {
-            info!("Loading scopes from cache");
-            if let Some(entry) = cache.get_scopes_for_repo(repo) {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)?
-                    .as_secs();
-                let head_commit_hash = repo
-                    .head()?
-                    .target()
-                    .ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "HEAD reference has no target. Are there commits in this repository?"
-                        )
-                    })?
-                    .to_string();
-
-                if now - entry.timestamp < TTL || entry.head_commit_hash == head_commit_hash {
-                    debug!("Cache is valid");
-                    return Ok(Some(entry.scopes.keys().cloned().collect::<Vec<_>>()));
-                } else {
-                    info!("Cache is stale");
-
-                    let regenerate_on_stale = config
-                        .as_ref()
-                        .map(|c| c.cache.regenerate_on_stale.clone())
-                        .unwrap_or_default();
-
-                    match regenerate_on_stale {
-                        RegenerateOnStale::Always => {
-                            info!("Regenerating cache");
-                            update_cache_for_repo(repo)?;
-                            let scopes = get_scopes_x_changes(repo)?;
-                            Some(scopes.unwrap_or_default())
-                        }
-                        RegenerateOnStale::Prompt => {
-                            if Confirm::new()
-                                .with_prompt("Cache is stale. Regenerate?")
-                                .interact()?
-                            {
-                                info!("Regenerating cache");
-                                update_cache_for_repo(repo)?;
-                                let scopes = get_scopes_x_changes(repo)?;
-                                Some(scopes.unwrap_or_default())
-                            } else {
-                                None
-                            }
-                        }
-                        RegenerateOnStale::Never => {
-                            info!("Not regenerating cache");
-                            None
-                        }
-                    }
-                }
-            } else {
-                None
-            }
-        }
-        Err(e) => {
-            warn!("Cache could not be loaded because of {:?}", e);
-            None
-        }
+    let scopes_from_cache = match try_get_scopes_from_cache(repo, &config)? {
+        CacheResult::Valid(scopes) => return Ok(Some(scopes)),
+        CacheResult::Stale(scopes) => scopes,
+        CacheResult::NotFound => None,
     };
 
     let other_scopes = if disable_history_search {
