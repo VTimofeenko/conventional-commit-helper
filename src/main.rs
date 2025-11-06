@@ -103,6 +103,7 @@ fn main() -> anyhow::Result<()> {
     validate_repo(&repo)?;
 
     let config = Config::load(&repo, args.config)?;
+    debug!("Loaded config: {:?}", config);
 
     match command {
         Command::Cache { command } => match command {

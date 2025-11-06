@@ -67,8 +67,13 @@ fn try_get_scopes_from_cache(repo: &Repository, config: &Option<Config>) -> Resu
                     .to_string();
 
                 if now - entry.timestamp < TTL || entry.head_commit_hash == head_commit_hash {
+                    debug!("HEAD commit hash: {}", head_commit_hash);
+                    debug!("Cache HEAD commit hash: {}", entry.head_commit_hash);
+                    debug!("Time check: {}", now - entry.timestamp < TTL);
                     debug!("Cache is valid");
-                    return Ok(CacheResult::Valid(entry.scopes.keys().cloned().collect::<Vec<_>>()));
+                    return Ok(CacheResult::Valid(
+                        entry.scopes.keys().cloned().collect::<Vec<_>>(),
+                    ));
                 } else {
                     info!("Cache is stale");
 

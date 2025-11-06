@@ -11,7 +11,7 @@ use predicate::str::{contains, starts_with};
 
 static BIN_NAME: &str = "conventional-commit-helper"; // Default binary name
 
-/// Ensure that the when run without parameters the program succeeds
+/// Ensure that when run without parameters the program succeeds
 #[test]
 fn default_run_no_args() {
     let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
@@ -259,10 +259,113 @@ fn cache_show() {
         .stdout(contains(repo_path.to_str().unwrap()));
 }
 
+/// Ensures that whatever changes I make, `--help` will print usage info
+#[test]
+fn test_help_message() {
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+
+    cmd.arg("--help");
+
+    cmd.assert().success().stdout(contains("Usage"));
+}
+
+/// Checks `--json` output – it should print something JSON-like
+#[test]
+fn test_json_output() {
+    init_logger();
+
+    let dir = assert_fs::TempDir::new().unwrap();
+    let _ = setup_repo_with_commits(dir.path(), &["init"]);
+    mk_config_with_types_only(dir.path());
+
+    // Setup command
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.arg("type");
+    cmd.arg("--json");
+    cmd.current_dir(dir.path());
+
+    cmd.assert()
+        .success()
+        .stdout(contains(r#"{"name":"foo","description":"bar"}"#));
+}
+
+/// Check failure if running against something other than a git repo
+#[test]
+fn test_not_a_git_repo() {
+    let dir = assert_fs::TempDir::new().unwrap();
+
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.current_dir(dir.path());
+    cmd.arg("type");
+    cmd.assert().failure();
+}
+
+/// Check that bare repo does not work
+#[test]
+fn test_bare_repo() {
+    let dir = assert_fs::TempDir::new().unwrap();
+    let repo_path = dir.path();
+    git2::Repository::init_bare(repo_path).unwrap();
+
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.arg("--repo-path").arg(repo_path);
+    cmd.arg("type");
+    cmd.assert().failure();
+}
+
+/// Nonexistent config file should lead to an error
+#[test]
+fn test_invalid_config_path() {
+    let dir = assert_fs::TempDir::new().unwrap();
+    let _ = setup_repo_with_commits(dir.path(), &["init"]);
+
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.arg("--config").arg("non-existent-file.toml");
+    cmd.arg("type");
+    cmd.current_dir(dir.path());
+    cmd.assert().failure();
+}
+
+/// Broken config file should lead to an error
+#[test]
+fn test_malformed_config_file() {
+    let dir = assert_fs::TempDir::new().unwrap();
+    let _ = setup_repo_with_commits(dir.path(), &["init"]);
+
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(&config_path, "not a valid toml file").unwrap();
+
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.arg("--config").arg(&config_path);
+    cmd.arg("type");
+    cmd.current_dir(dir.path());
+    cmd.assert().failure();
+}
+
+/// Ensure that `--repo-path` argument works
+#[test]
+fn test_repo_path_argument() {
+    init_logger();
+
+    // Setup environment
+    let dir = assert_fs::TempDir::new().unwrap();
+    let repo_path = dir.path().join("repo");
+    let _ = setup_repo_with_commits(&repo_path, &["init"]);
+    mk_config_with_types_only(&repo_path);
+
+    // Setup command
+    let mut cmd = Command::cargo_bin(BIN_NAME).unwrap();
+    cmd.arg("--repo-path").arg(&repo_path);
+    cmd.arg("type");
+
+    // Test
+
+    cmd.assert().success().stdout(contains("foo"));
+}
 // Ensure logger is initialized only once for all tests
 static INIT: Once = Once::new();
 
-// To be used when neeeded by the tests, otherwise too spammy.
+// To be used when needed by the tests, otherwise too spammy.
 fn init_logger() {
     INIT.call_once(|| {
         env_logger::Builder::new()

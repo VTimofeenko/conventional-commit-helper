@@ -108,7 +108,7 @@ impl Config {
         })
     }
 
-    pub fn from_file(path: &Path) -> Result<Option<Self>> {
+    fn from_file_optional(path: &Path) -> Result<Option<Self>> {
         match path.exists() {
             true => {
                 let content = fs::read_to_string(path)?;
@@ -117,6 +117,10 @@ impl Config {
             }
             false => Ok(None),
         }
+    }
+
+    pub fn from_file(path: &Path) -> Result<Self> {
+        Self::from_file_optional(path)?.ok_or_else(|| anyhow::anyhow!("File not found: {:?}", path))
     }
 
     fn get_global_config_path() -> Option<PathBuf> {
@@ -155,10 +159,10 @@ impl Config {
     pub fn load(repo: &Repository, from_path: Option<PathBuf>) -> Result<Option<Self>> {
         if let Some(path) = from_path {
             debug!("Loading config from path: {:?}", path);
-            return Self::from_file(&path);
+            return Self::from_file(&path).map(Some);
         }
 
-        let repo_config = Self::from_file(
+        let repo_config = Self::from_file_optional(
             &repo
                 .workdir()
                 .expect("Repository should not be bare")
@@ -167,7 +171,7 @@ impl Config {
 
         let global_config_path = Self::get_global_config_path();
         let global_config = if let Some(path) = global_config_path {
-            Self::from_file(&path)?
+            Self::from_file_optional(&path)?
         } else {
             None
         };
