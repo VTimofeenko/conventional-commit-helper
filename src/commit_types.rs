@@ -1,12 +1,74 @@
+use crate::config::Config;
+use crate::utils::PrintableEntity;
 use anyhow::Result;
 use log::info;
+use serde::{Deserialize, Serialize};
 
-use crate::config::Config;
-use crate::utils::{CommitType, DEFAULT_COMMIT_TYPES};
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
+pub struct CommitType {
+    pub name: String,
+    pub description: String,
+}
 
-pub fn get_commit_types_from_repo_or_default(
-    config: Option<Config>,
-) -> Result<Vec<CommitType<String>>> {
+impl PrintableEntity for CommitType {
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn description(&self) -> &str {
+        &self.description
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct CommitTypeRef<'a> {
+    pub name: &'a str,
+    pub description: &'a str,
+}
+
+pub const DEFAULT_COMMIT_TYPES: &[CommitTypeRef] = &[
+    CommitTypeRef {
+        name: "feat",
+        description: "A new feature",
+    },
+    CommitTypeRef {
+        name: "fix",
+        description: "A bug fix",
+    },
+    CommitTypeRef {
+        name: "docs",
+        description: "Documentation only changes",
+    },
+    CommitTypeRef {
+        name: "style",
+        description: "Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)",
+    },
+    CommitTypeRef {
+        name: "refactor",
+        description: "A code change that neither fixes a bug nor adds a feature",
+    },
+    CommitTypeRef {
+        name: "perf",
+        description: "A code change that improves performance",
+    },
+    CommitTypeRef {
+        name: "test",
+        description: "Adding missing tests or correcting existing tests",
+    },
+    CommitTypeRef {
+        name: "build",
+        description: "Changes that affect the build system or external dependencies (example scopes: gulp, broccoli, npm)",
+    },
+    CommitTypeRef {
+        name: "ci",
+        description: "Changes to our CI configuration files and scripts (example scopes: Travis, Circle, BrowserStack, SauceLabs)",
+    },
+    CommitTypeRef {
+        name: "chore",
+        description: "Other changes that don't modify src or test files",
+    },
+];
+
+pub fn get_commit_types_from_repo_or_default(config: Option<Config>) -> Result<Vec<CommitType>> {
     match config {
         Some(config) => {
             info!("Found config, returning its commit_types");
@@ -19,15 +81,12 @@ pub fn get_commit_types_from_repo_or_default(
     }
 }
 
-pub fn get_default_commit_types() -> Vec<CommitType<String>> {
+pub fn get_default_commit_types() -> Vec<CommitType> {
     DEFAULT_COMMIT_TYPES
         .iter()
-        .map(|c| {
-            // This might be better implemented through From?
-            CommitType::<String> {
-                name: c.name.to_string(),
-                description: c.description.to_string(),
-            }
+        .map(|c| CommitType {
+            name: c.name.to_string(),
+            description: c.description.to_string(),
         })
         .collect()
 }
@@ -73,7 +132,7 @@ mod tests {
 
         let res = get_commit_types_from_repo_or_default(config);
 
-        assert_eq!(res.unwrap(), DEFAULT_COMMIT_TYPES)
+        assert_eq!(res.unwrap(), get_default_commit_types())
     }
 
     #[rstest]

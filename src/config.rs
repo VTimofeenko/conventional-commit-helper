@@ -9,7 +9,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 
-use crate::utils::{UserProvidedCommitScope, UserProvidedCommitType};
+use crate::commit_scopes::CommitScope;
+use crate::commit_types::CommitType;
 
 pub const DEFAULT_CONFIG_PATH_IN_REPO: &str =
     formatcp!(".dev{}conventional-commit-helper.toml", MAIN_SEPARATOR);
@@ -47,10 +48,10 @@ pub struct Config {
     // Using "types" to prevent repetition in the config file
     // The code should use commit_types to be less ambiguous about the 'type' word
     #[serde(rename = "types")]
-    pub commit_types: Option<Vec<UserProvidedCommitType>>,
+    pub commit_types: Option<Vec<CommitType>>,
 
     #[serde(rename = "scopes")]
-    pub commit_scopes: Option<Vec<UserProvidedCommitScope>>,
+    pub commit_scopes: Option<Vec<CommitScope>>,
 
     pub general: Option<GeneralConfig>,
 
@@ -82,12 +83,22 @@ impl Config {
     /// Extracted for easier testing
     fn from_str(toml_str: &str) -> Result<Self> {
         let initial_result: ReadConfig = toml::from_str(toml_str)?;
-        let commit_types: Option<Vec<UserProvidedCommitType>> = initial_result
-            .commit_types
-            .map(|x| x.iter().map(UserProvidedCommitType::from).collect());
-        let commit_scopes: Option<Vec<UserProvidedCommitType>> = initial_result
-            .commit_scopes
-            .map(|x| x.iter().map(UserProvidedCommitScope::from).collect());
+        let commit_types: Option<Vec<CommitType>> = initial_result.commit_types.map(|x| {
+            x.iter()
+                .map(|(k, v)| CommitType {
+                    name: k.clone(),
+                    description: v.clone(),
+                })
+                .collect()
+        });
+        let commit_scopes: Option<Vec<CommitScope>> = initial_result.commit_scopes.map(|x| {
+            x.iter()
+                .map(|(k, v)| CommitScope {
+                    name: k.clone(),
+                    description: v.clone(),
+                })
+                .collect()
+        });
 
         Ok(Self {
             commit_scopes,
@@ -188,11 +199,12 @@ mod test {
         let res = Config::from_str(toml_str);
 
         let expected = Config {
-            commit_types: Some(vec![UserProvidedCommitType {
+            commit_types: Some(vec![CommitType {
                 name: "foo".to_string(),
                 description: "bar".to_string(),
             }]),
-            commit_scopes: Some(vec![UserProvidedCommitScope {
+
+            commit_scopes: Some(vec![CommitScope {
                 name: "foz".to_string(),
                 description: "baz".to_string(),
             }]),
@@ -231,11 +243,11 @@ mod test {
     #[test]
     fn test_config_merge() {
         let repo_config = Config {
-            commit_types: Some(vec![UserProvidedCommitType {
+            commit_types: Some(vec![CommitType {
                 name: "foo".to_string(),
                 description: "bar".to_string(),
             }]),
-            commit_scopes: Some(vec![UserProvidedCommitScope {
+            commit_scopes: Some(vec![CommitScope {
                 name: "foz".to_string(),
                 description: "baz".to_string(),
             }]),
@@ -246,11 +258,11 @@ mod test {
         };
 
         let global_config = Config {
-            commit_types: Some(vec![UserProvidedCommitType {
+            commit_types: Some(vec![CommitType {
                 name: "foo".to_string(),
                 description: "bar".to_string(),
             }]),
-            commit_scopes: Some(vec![UserProvidedCommitScope {
+            commit_scopes: Some(vec![CommitScope {
                 name: "global".to_string(),
                 description: "global".to_string(),
             }]),
@@ -261,16 +273,16 @@ mod test {
         let merged = repo_config.merge(global_config);
 
         let expected = Config {
-            commit_types: Some(vec![UserProvidedCommitType {
+            commit_types: Some(vec![CommitType {
                 name: "foo".to_string(),
                 description: "bar".to_string(),
             }]),
             commit_scopes: Some(vec![
-                UserProvidedCommitScope {
+                CommitScope {
                     name: "foz".to_string(),
                     description: "baz".to_string(),
                 },
-                UserProvidedCommitScope {
+                CommitScope {
                     name: "global".to_string(),
                     description: "global".to_string(),
                 },

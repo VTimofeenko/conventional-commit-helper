@@ -5,7 +5,7 @@ use itertools::any;
 use log::{info, trace, warn};
 use std::collections::{HashMap, HashSet};
 
-use crate::utils::UserProvidedCommitScope;
+use super::CommitScope;
 
 /// Things that deal with the repository go here
 
@@ -130,7 +130,7 @@ fn get_scope_from_commit_message(message: &str) -> Option<String> {
 
 pub fn get_scopes_x_changes(
     repo: &Repository,
-) -> Result<Option<HashMap<UserProvidedCommitScope, ChangedFiles>>> {
+) -> Result<Option<HashMap<CommitScope, ChangedFiles>>> {
     // idea:
     // Have an accumulator
     // Walk through the repo using reflog?
@@ -143,7 +143,7 @@ pub fn get_scopes_x_changes(
 
     let res = revwalk.fold(
         // let res = repo.revwalk()?.push_head().iter().fold(
-        HashMap::<UserProvidedCommitScope, ChangedFiles>::new(),
+        HashMap::<CommitScope, ChangedFiles>::new(),
         |mut acc, revwalk_entry| {
             match revwalk_entry {
                 Ok(oid) => {
@@ -170,7 +170,7 @@ pub fn get_scopes_x_changes(
                     };
                     let scope = get_scope_from_commit_message(summary);
                     if let Some(extracted_scope) = scope {
-                        let scope_obj = UserProvidedCommitScope::new(extracted_scope);
+                        let scope_obj = CommitScope::new(extracted_scope);
                         let changed_files = match get_changed_files_from_commit(&commit, repo) {
                             Ok(files) => files,
                             Err(e) => {
@@ -332,10 +332,8 @@ mod tests {
 
         let res = get_scopes_x_changes(&repo).unwrap();
 
-        let expected: HashMap<UserProvidedCommitScope, ChangedFiles> = HashMap::from([(
-            UserProvidedCommitScope::new("foz".to_string()),
-            mk_set(["one"]),
-        )]);
+        let expected: HashMap<CommitScope, ChangedFiles> =
+            HashMap::from([(CommitScope::new("foz".to_string()), mk_set(["one"]))]);
 
         assert_eq!(res, Some(expected));
     }
@@ -357,13 +355,10 @@ mod tests {
 
         let res = get_scopes_x_changes(&repo).unwrap();
 
-        let expected: HashMap<UserProvidedCommitScope, ChangedFiles> = HashMap::from([
+        let expected: HashMap<CommitScope, ChangedFiles> = HashMap::from([
+            (CommitScope::new("foz".to_string()), mk_set(["one", "two"])),
             (
-                UserProvidedCommitScope::new("foz".to_string()),
-                mk_set(["one", "two"]),
-            ),
-            (
-                UserProvidedCommitScope::new("baz".to_string()),
+                CommitScope::new("baz".to_string()),
                 mk_set(["three", "two"]),
             ),
         ]);

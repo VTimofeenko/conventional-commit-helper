@@ -59,12 +59,12 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::commit_scopes::commit::{get_scopes_x_changes, ChangedFiles};
-use crate::utils::UserProvidedCommitScope;
+use crate::commit_scopes::CommitScope;
 
 // Data Structures for the Cache
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CacheEntry {
-    pub scopes: HashMap<UserProvidedCommitScope, ChangedFiles>,
+    pub scopes: HashMap<CommitScope, ChangedFiles>,
     pub timestamp: u64,
     pub head_commit_hash: String,
 }

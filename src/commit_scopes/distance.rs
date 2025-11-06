@@ -1,7 +1,7 @@
 use itertools::sorted;
 use log::info;
 
-use crate::utils::UserProvidedCommitScope;
+use super::CommitScope;
 
 use super::commit::ChangedFiles;
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -89,8 +89,8 @@ use std::collections::{HashMap, HashSet};
 
 fn find_by_overlap(
     staged_files: ChangedFiles,
-    scope_set: HashMap<UserProvidedCommitScope, ChangedFiles>,
-) -> HashSet<UserProvidedCommitScope> {
+    scope_set: HashMap<CommitScope, ChangedFiles>,
+) -> HashSet<CommitScope> {
     scope_set
         .iter()
         // Go through the set, constructing pairs (scope, count_of_overlapping_items)
@@ -120,15 +120,12 @@ fn find_by_overlap(
 
 pub fn find_closest_neighbor(
     staged_files: ChangedFiles,
-    scope_set: HashMap<UserProvidedCommitScope, ChangedFiles>,
-) -> Option<UserProvidedCommitScope> {
+    scope_set: HashMap<CommitScope, ChangedFiles>,
+) -> Option<CommitScope> {
     info!("Staged files: {:?}", staged_files);
     let res = find_by_overlap(staged_files, scope_set);
 
-    sorted(res)
-        .collect::<Vec<UserProvidedCommitScope>>()
-        .first()
-        .cloned()
+    sorted(res).collect::<Vec<CommitScope>>().first().cloned()
 }
 
 #[cfg(test)]
@@ -139,13 +136,13 @@ mod test {
     use std::collections::{HashMap, HashSet};
 
     #[fixture]
-    fn needle() -> UserProvidedCommitScope {
-        UserProvidedCommitScope::new("needle".to_string())
+    fn needle() -> CommitScope {
+        CommitScope::new("needle".to_string())
     }
 
     #[fixture]
-    fn cruft() -> UserProvidedCommitScope {
-        UserProvidedCommitScope::new("cruft".to_string())
+    fn cruft() -> CommitScope {
+        CommitScope::new("cruft".to_string())
     }
 
     /// Test exactly equal search result is found in a trivial case
@@ -156,8 +153,8 @@ mod test {
 
     #[rstest]
     fn test_exact_match_trivial_one_result(
-        needle: UserProvidedCommitScope,
-        cruft: UserProvidedCommitScope,
+        needle: CommitScope,
+        cruft: CommitScope,
         staged_files: ChangedFiles,
     ) {
         let haystack = HashMap::from([
@@ -178,8 +175,8 @@ mod test {
     /// Test exactly equal search result + tie breaker
     #[rstest]
     fn test_exact_match_multiple_results(
-        needle: UserProvidedCommitScope,
-        cruft: UserProvidedCommitScope,
+        needle: CommitScope,
+        cruft: CommitScope,
         staged_files: ChangedFiles,
     ) {
         let mut other_needle = needle.clone();
@@ -203,8 +200,8 @@ mod test {
 
     #[rstest]
     fn test_staged_is_subset_match_one_result(
-        needle: UserProvidedCommitScope,
-        cruft: UserProvidedCommitScope,
+        needle: CommitScope,
+        cruft: CommitScope,
         staged_files: ChangedFiles,
     ) {
         let mut old_changed_files = staged_files.clone();
@@ -221,8 +218,8 @@ mod test {
 
     #[rstest]
     fn test_staged_is_superset_match_one_result(
-        needle: UserProvidedCommitScope,
-        cruft: UserProvidedCommitScope,
+        needle: CommitScope,
+        cruft: CommitScope,
         staged_files: ChangedFiles,
     ) {
         let mut old_changed_files = staged_files.clone();
@@ -239,8 +236,8 @@ mod test {
 
     #[rstest]
     fn test_staged_partial_overlap_match_one_result(
-        needle: UserProvidedCommitScope,
-        cruft: UserProvidedCommitScope,
+        needle: CommitScope,
+        cruft: CommitScope,
         staged_files: ChangedFiles,
     ) {
         let mut old_changed_files = staged_files.clone();
@@ -269,8 +266,8 @@ mod test {
 
     #[rstest]
     fn test_staged_no_overlap_no_result(
-        needle: UserProvidedCommitScope,
-        cruft: UserProvidedCommitScope,
+        needle: CommitScope,
+        cruft: CommitScope,
         staged_files: ChangedFiles,
     ) {
         let cruft_files = HashSet::from(["qux".to_string()]);

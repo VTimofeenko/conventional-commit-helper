@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use log::{debug, info};
+use serde::Serialize;
 use std::path::PathBuf;
 
 use self::commit_types::get_default_commit_types;
@@ -68,20 +69,14 @@ struct Args {
     command: Option<Command>,
 }
 
-fn default_print<S>(output: Vec<PrintableEntity<S>>)
-where
-    S: std::fmt::Display,
-    std::string::String: std::convert::From<S>,
-{
-    output.iter().for_each(|x| println!("{}", x))
+fn default_print(output: &[impl PrintableEntity]) {
+    output
+        .iter()
+        .for_each(|x| println!("{:20} {}", x.name(), x.description()));
 }
 
-fn json_print<S>(output: Vec<PrintableEntity<S>>) -> anyhow::Result<()>
-where
-    S: serde::Serialize,
-    std::string::String: std::convert::From<S>,
-{
-    println!("{}", serde_json::to_string(&output)?);
+fn json_print<T: Serialize>(output: &Vec<T>) -> anyhow::Result<()> {
+    println!("{}", serde_json::to_string(output)?);
     Ok(())
 }
 
@@ -97,7 +92,7 @@ fn main() -> anyhow::Result<()> {
     // Handle no given command. This should be done first so nothing is really validated.
     let Some(command) = args.command else {
         info!("Running in default mode, just printing the types");
-        default_print(get_default_commit_types());
+        default_print(&get_default_commit_types());
         return Ok(());
     };
 
@@ -162,8 +157,8 @@ fn main() -> anyhow::Result<()> {
             let output = commit_types::get_commit_types_from_repo_or_default(config)?;
 
             match json {
-                true => json_print(output)?,
-                false => default_print(output),
+                true => json_print(&output)?,
+                false => default_print(&output),
             }
         }
         Command::Scope { json } => {
@@ -171,8 +166,8 @@ fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(Vec::new);
 
             match json {
-                true => json_print(output)?,
-                false => default_print(output),
+                true => json_print(&output)?,
+                false => default_print(&output),
             }
         }
     };

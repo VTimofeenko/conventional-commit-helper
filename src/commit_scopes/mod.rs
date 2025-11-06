@@ -1,16 +1,15 @@
-use dialoguer::Confirm;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
-use std::hash::Hash;
-
+use crate::cache::{update_cache_for_repo, Cache};
+use crate::config::{Config, RegenerateOnStale};
+use crate::utils::PrintableEntity;
 use anyhow::Result;
+use dialoguer::Confirm;
 use git2::Repository;
 use itertools::sorted;
 use log::{debug, info, warn};
-
-use crate::cache::{update_cache_for_repo, Cache};
-use crate::config::{Config, RegenerateOnStale};
-use crate::utils::UserProvidedCommitScope;
+use serde::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::hash::Hash;
 
 pub mod commit;
 
@@ -19,6 +18,30 @@ use self::distance::find_closest_neighbor;
 
 mod distance;
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Hash, Ord, PartialOrd)]
+pub struct CommitScope {
+    pub name: String,
+    pub description: String,
+}
+
+impl CommitScope {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            description: "".to_string(),
+        }
+    }
+}
+
+impl PrintableEntity for CommitScope {
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn description(&self) -> &str {
+        &self.description
+    }
+}
+
 const TTL: u64 = 86400; // 24 hours
 
 /// The main entry point to retrieve commit scopes from a git repository at location
@@ -26,7 +49,7 @@ const TTL: u64 = 86400; // 24 hours
 pub fn try_get_commit_scopes_from_repo(
     repo: &Repository,
     config: Option<Config>,
-) -> Result<Option<Vec<UserProvidedCommitScope>>> {
+) -> Result<Option<Vec<CommitScope>>> {
     debug!("Looking for scopes in config");
     let mut hasher = DefaultHasher::new();
     config.hash(&mut hasher);
@@ -166,8 +189,7 @@ pub fn try_get_commit_scopes_from_repo(
         (None, Some(history_scopes)) => {
             debug!("Found scopes only in history or cache");
 
-            let mut scopes =
-                sorted(history_scopes.keys().cloned()).collect::<Vec<UserProvidedCommitScope>>();
+            let mut scopes = sorted(history_scopes.keys().cloned()).collect::<Vec<CommitScope>>();
 
             // check the current staged changes, push closest match to the front
             if let Some(staged_files) = get_staged_files(repo)? {
