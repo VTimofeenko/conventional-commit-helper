@@ -112,17 +112,51 @@ fn main() -> anyhow::Result<()> {
     match command {
         Command::Cache { command } => match command {
             CacheCommand::Create => {
-                cache::create_cache()?;
+                println!("Creating the cache");
+                let cache_path = cache::create_cache()?;
+                println!("Cache created at {}", cache_path.to_string_lossy());
                 info!("Populating the cache for the repo after cache creation");
                 cache::update_cache_for_repo(&repo)?
             }
-            CacheCommand::Update => cache::update_cache_for_repo(&repo)?,
+            CacheCommand::Update => {
+                println!("Updating the cache");
+                cache::update_cache_for_repo(&repo)?;
+                println!("Cache updated");
+            }
 
-            CacheCommand::Drop => cache::drop_cache_for_repo(&repo)?,
+            CacheCommand::Drop => {
+                println!("Dropping the cache for the repo");
+                if let Some(repo_path) = cache::drop_cache_for_repo(&repo)? {
+                    println!("Dropped the cache for repo at '{:?}'", repo_path);
+                } else {
+                    println!(
+                        "Cache for repo at '{:?}' does not exist, not doing a thing",
+                        repo.path()
+                    );
+                }
+            }
 
-            CacheCommand::Nuke => cache::nuke_cache()?,
+            CacheCommand::Nuke => {
+                println!("Removing the whole cache");
+                if cache::nuke_cache()? {
+                    println!("Cache is no more. It ceased to be.");
+                } else {
+                    println!("Cache does not exist");
+                }
+            }
 
-            CacheCommand::Show => cache::show_cache()?,
+            CacheCommand::Show => {
+                let cache = cache::show_cache()?;
+                println!("Cached repos:");
+                for (k, v) in cache.entries {
+                    println!(
+                        "- {}: timestamp: {}, hash: {}",
+                        k.to_string_lossy(),
+                        v.timestamp,
+                        v.head_commit_hash
+                    );
+                }
+            }
         },
         Command::Type { json } => {
             let output = commit_types::get_commit_types_from_repo_or_default(config)?;

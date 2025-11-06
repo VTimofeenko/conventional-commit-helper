@@ -52,7 +52,7 @@
 use anyhow::{bail, Context, Result};
 use directories::ProjectDirs;
 use git2::Repository;
-use log::{debug, trace};
+use log::{debug, info, trace};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -142,34 +142,32 @@ fn get_repo_id(repo: &Repository) -> RepoID {
 }
 
 /// Create the cache. It makes very little sense to create just an empty cache, so takes a repo.
-pub fn create_cache() -> Result<()> {
-    // Error hear means "cannot determine cache location" => error out, don't do anything.
-    println!("Creating the cache");
+pub fn create_cache() -> Result<PathBuf> {
+    info!("Creating the cache");
     let cache_path = get_cache_path()?;
 
     // Create parent directory if it does not exist
     if let Some(parent) = cache_path.parent() {
         if !parent.exists() {
-            println!("Creating the parent dir to contain the cache");
+            debug!("Creating the parent dir to contain the cache");
             std::fs::create_dir_all(parent)?;
         }
     }
 
     // Create an empty cache
     if !cache_path.exists() {
-        println!("Creating empty cache");
+        info!("Creating empty cache");
         let cache = Cache::new();
         cache.save()?;
     }
 
-    println!("Cache created at {}", cache_path.to_string_lossy());
-    Ok(())
+    Ok(cache_path)
 }
 
 /// Update the cache for specific repo
 pub fn update_cache_for_repo(repo: &Repository) -> Result<()> {
     let repo_id = get_repo_id(repo);
-    println!("Updating the scope cache for repo '{:?}'", repo_id);
+    info!("Updating the scope cache for repo '{:?}'", repo_id);
 
     Cache::lock()?;
 
@@ -181,7 +179,7 @@ pub fn update_cache_for_repo(repo: &Repository) -> Result<()> {
 
     match scopes_changes {
         Some(scopes_changes) => {
-            println!("Writing scopes x changes into the cache");
+            debug!("Writing scopes x changes into the cache");
             cache.entries.insert(
                 repo_id,
                 CacheEntry {
@@ -203,57 +201,43 @@ pub fn update_cache_for_repo(repo: &Repository) -> Result<()> {
     };
 
     cache.save()?;
-    println!("Cache saved");
+    info!("Cache saved");
     Ok(())
 }
 
 /// Drop cache for individual repo
-pub fn drop_cache_for_repo(repo: &Repository) -> Result<()> {
+pub fn drop_cache_for_repo(repo: &Repository) -> Result<Option<PathBuf>> {
     let repo_id = get_repo_id(repo);
-    println!("Dropping the scope cache for repo '{:?}'", repo_id);
+    info!("Dropping the scope cache for repo '{:?}'", repo_id);
 
     Cache::lock()?;
 
     // Load the cache
     let mut cache = Cache::load()?;
 
-    // If the entry exists, drop it from cache.
-    match cache.entries.remove(&repo_id) {
-        Some(_) => println!("Dropped the cache for repo at '{:?}'", repo.path()),
-        None => println!(
-            "Cache for repo at '{:?}' does not exist, not doing a thing",
-            repo.path()
-        ),
+    let res = if cache.entries.remove(&repo_id).is_some() {
+        Some(repo.path().to_path_buf())
+    } else {
+        None
     };
 
     cache.save()?;
 
-    Ok(())
+    Ok(res)
 }
 
-pub fn nuke_cache() -> Result<()> {
-    println!("Destroying the whole cache");
+pub fn nuke_cache() -> Result<bool> {
+    info!("Destroying the whole cache");
     let cache_path = get_cache_path()?;
-    match cache_path.exists() {
-        true => {
-            std::fs::remove_file(cache_path)?;
-            println!("Cache is no more. It ceased to be.");
-        }
-        false => println!("Cache does not exist"),
+    if cache_path.exists() {
+        std::fs::remove_file(cache_path)?;
+        Ok(true)
+    } else {
+        Ok(false)
     }
-    Ok(())
 }
 
-pub fn show_cache() -> Result<()> {
-    println!("Cached repos:");
-    let cache = Cache::load()?;
-    for (k, v) in cache.entries {
-        println!(
-            "- {}: timestamp: {}, hash: {}",
-            k.to_string_lossy(),
-            v.timestamp,
-            v.head_commit_hash
-        );
-    }
-    Ok(())
+pub fn show_cache() -> Result<Cache> {
+    info!("Showing cached repos");
+    Cache::load()
 }
