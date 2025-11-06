@@ -42,18 +42,13 @@ impl PrintableEntity for CommitScope {
     }
 }
 
-
-
 enum CacheResult {
     Valid(Vec<CommitScope>),
     Stale(Option<HashMap<CommitScope, ChangedFiles>>),
     NotFound,
 }
 
-fn try_get_scopes_from_cache(
-    repo: &Repository,
-    config: &Option<Config>,
-) -> Result<CacheResult> {
+fn try_get_scopes_from_cache(repo: &Repository, config: &Option<Config>) -> Result<CacheResult> {
     match Cache::load() {
         Ok(cache) => {
             info!("Loading scopes from cache");
