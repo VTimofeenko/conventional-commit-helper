@@ -334,12 +334,15 @@ mod tests {
 
     use crate::utils::time::mock_time;
     use chrono::Utc;
+    use std::env;
 
     #[test]
     fn test_cache_is_stale_after_ttl() {
         let dir = testdir!();
         let repo = setup_repo_with_commits(&dir, &["init", "feat(scope1): message"]);
         let config = Config::load(&repo, None).unwrap();
+        // Override this so as not to pollute the main cache
+        env::set_var("XDG_CACHE_HOME", &testdir!());
 
         // Create a cache
         create_cache().unwrap();
