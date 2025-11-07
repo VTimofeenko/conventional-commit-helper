@@ -61,11 +61,14 @@ use serde::{Deserialize, Serialize};
 use crate::commit_scopes::commit::{get_scopes_x_changes, ChangedFiles};
 use crate::commit_scopes::CommitScope;
 
+use chrono::{DateTime, Utc};
+
 // Data Structures for the Cache
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CacheEntry {
     pub scopes: HashMap<CommitScope, ChangedFiles>,
-    pub timestamp: u64,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub timestamp: DateTime<Utc>,
     pub head_commit_hash: String,
 }
 
@@ -184,9 +187,7 @@ pub fn update_cache_for_repo(repo: &Repository) -> Result<()> {
                 repo_id,
                 CacheEntry {
                     scopes: scopes_changes,
-                    timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)?
-                        .as_secs(),
+                    timestamp: crate::utils::time::now(),
                     head_commit_hash: repo
                         .head()?
                         .target()

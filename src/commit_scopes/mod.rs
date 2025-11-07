@@ -48,14 +48,15 @@ enum CacheResult {
     NotFound,
 }
 
+use chrono::Duration;
+
+use crate::utils::time;
+
 fn try_get_scopes_from_cache(repo: &Repository, config: &Option<Config>) -> Result<CacheResult> {
     match Cache::load() {
         Ok(cache) => {
             info!("Loading scopes from cache");
             if let Some(entry) = cache.get_scopes_for_repo(repo) {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)?
-                    .as_secs();
                 let head_commit_hash = repo
                     .head()?
                     .target()
@@ -66,10 +67,10 @@ fn try_get_scopes_from_cache(repo: &Repository, config: &Option<Config>) -> Resu
                     })?
                     .to_string();
 
-                if now - entry.timestamp < TTL || entry.head_commit_hash == head_commit_hash {
-                    debug!("HEAD commit hash: {}", head_commit_hash);
-                    debug!("Cache HEAD commit hash: {}", entry.head_commit_hash);
-                    debug!("Time check: {}", now - entry.timestamp < TTL);
+                if time::now().signed_duration_since(entry.timestamp)
+                    < Duration::seconds(TTL as i64)
+                    && entry.head_commit_hash == head_commit_hash
+                {
                     debug!("Cache is valid");
                     return Ok(CacheResult::Valid(
                         entry.scopes.keys().cloned().collect::<Vec<_>>(),
@@ -277,6 +278,7 @@ fn push_to_first<T: Ord>(mut v: Vec<T>, first: T) -> Vec<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::create_cache;
     use conventional_commit_helper::test_utils::{
         mk_config_with_scopes_only, setup_config_file_in_path, setup_repo_with_commits,
     };
@@ -328,5 +330,29 @@ mod tests {
         assert_eq!(res.clone().len(), 1);
         assert_eq!(res.clone().first().unwrap().name, "foz");
         assert_eq!(res.first().unwrap().description, "baz");
+    }
+
+    use crate::utils::time::mock_time;
+    use chrono::Utc;
+
+    #[test]
+    fn test_cache_is_stale_after_ttl() {
+        let dir = testdir!();
+        let repo = setup_repo_with_commits(&dir, &["init", "feat(scope1): message"]);
+        let config = Config::load(&repo, None).unwrap();
+
+        // Create a cache
+        create_cache().unwrap();
+        update_cache_for_repo(&repo).unwrap();
+
+        // Mock the time to be in the future
+        let future_time = Utc::now() + Duration::seconds(TTL as i64 + 1);
+        mock_time::set(future_time);
+
+        // Check that the cache is stale
+        let result = try_get_scopes_from_cache(&repo, &config).unwrap();
+        assert!(matches!(result, CacheResult::Stale(_)));
+
+        mock_time::clear();
     }
 }
