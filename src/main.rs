@@ -72,7 +72,7 @@ struct Args {
 fn default_print(output: &[impl PrintableEntity]) {
     output
         .iter()
-        .for_each(|x| println!("{:20} {}", x.name(), x.description()));
+        .for_each(|x| println!("{}: {}", x.name(), x.description()));
 }
 
 fn json_print<T: Serialize>(output: &Vec<T>) -> anyhow::Result<()> {
