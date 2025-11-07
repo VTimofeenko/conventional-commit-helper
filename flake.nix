@@ -20,18 +20,19 @@
         { pkgs, ... }:
         let
           craneLib = inputs.crane.mkLib pkgs;
-          pkg = craneLib.buildPackage {
-            src = craneLib.cleanCargoSource ./.;
-            meta.mainProgram = "conventional-commit-helper";
-            # My cache_ops test makes some incorrect assumptions about paths
-            # that are not true in context of a nix build.
-            # In the spirit of just getting it to work, disable the test.
-            # TODO: fix the test
-            # I will probably need to:
-            # 1. Override the HOME variable from /homeless-shelter for the check phase
-            # 2. Change the cache_path variable in the test to work better on MacOS
-            cargoTestExtraArgs = pkgs.lib.optionalString pkgs.stdenv.isDarwin "-- --skip cache_ops";
-          };
+          pkg =
+            (craneLib.buildPackage {
+              src = craneLib.cleanCargoSource ./.;
+              meta.mainProgram = "conventional-commit-helper";
+              cargoTestExtraArgs = pkgs.lib.optionalString pkgs.stdenv.isDarwin "-- --skip cache_ops";
+            }).overrideAttrs
+              {
+                preCheck = ''
+                  export HOME="$TMPDIR/home";
+                  mkdir -p $HOME
+                '';
+
+              };
         in
         {
           checks = {
