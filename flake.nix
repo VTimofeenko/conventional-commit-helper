@@ -40,7 +40,7 @@
           };
           packages.default = pkg;
           devShells.default = craneLib.devShell {
-            packages = [ pkgs.mdsh ];
+            packages = [ pkgs.mdsh pkgs.cargo-edit ];
           };
         };
     };
