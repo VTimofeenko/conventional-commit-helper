@@ -14,11 +14,6 @@ Generate [conventional commits][1] subject from a CLI.
 
 # Limitations/roadmap
 
-- Scopes: no way to disable scope search in history (to be done)
-- Scopes: no way to hide scopes from suggestions (to be done)
-- Configuration: no global config file (to be done)
-- Configuration: no support for alternative config location, so the config needs
-  to be checked in or added to gitignore/exclude (to be done)
 - Distribution: only accessible through nix (will not be done unless someone
   actually needs this)
 - Scopes: Scopes are checked only for the current branch (most likely will not be done)
@@ -43,6 +38,7 @@ Commands:
 
 Options:
       --repo-path <REPO_PATH>  Path to the non-bare git repository [default: .]
+      --config <CONFIG>        Path to a custom config file
   -v, --verbose...             Increase logging verbosity
   -q, --quiet...               Decrease logging verbosity
   -h, --help                   Print help
