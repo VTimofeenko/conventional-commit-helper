@@ -60,7 +60,7 @@ pub const DEFAULT_COMMIT_TYPES: &[CommitTypeRef] = &[
     },
     CommitTypeRef {
         name: "ci",
-        description: "Changes to our CI configuration files and scripts (example scopes: Travis, Circle, BrowserStack, SauceLabs)",
+        description: "Changes to the CI configuration files and scripts",
     },
     CommitTypeRef {
         name: "chore",
